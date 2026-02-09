@@ -1,0 +1,772 @@
+---
+title: "VLH_turbine_090226"
+output: html_document
+date: "2026-02-09"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+This markdown file is formatted to be executed with a single run by importing pre-processed BDS sensor data and performing downstream analysis.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 6,
+  fig.align = "center"
+)
+knitr::opts_knit$set(root.dir = getwd())
+```
+
+# 1. Required libraries and helpers
+
+```{r libraries, echo=FALSE, message = FALSE}
+
+library(tidyverse) # mainly for dplyr and ggplot
+library(plotly) # interactive plot
+library(ggdist) # kernel density plot
+library(cowplot) #arrange multipanel plots
+library(kSamples) # Anderson Darling test
+library(binom) #95% CI Wilson
+library(dlookr)
+
+```
+
+## 1.1 Import sensor data
+
+Import and clean pre-processed sensor data. Import data already has 'bed sensors' removed. Some final smaller changes made to data. See comments where necessary. 
+
+```{r data_import, echo=FALSE, message = FALSE}
+
+denver_files <- list.files(
+  "./input",
+  pattern = "^denver_.*\\.csv$",
+  full.names = TRUE
+)
+
+denver_data <- denver_files %>%
+  map_dfr(read_csv)
+
+
+# Setup data structure with expanded treatments
+denver_data <- denver_data %>%
+  mutate(
+    # Extract RPM as numeric for dose-response modeling
+    rpm = as.numeric(str_extract(treatment, "\\d+")),
+    
+    # Extract configuration type
+    configuration = factor(
+      str_extract(treatment, "(original|modified)"),
+      levels = c("original", "modified"),
+      labels = c("Original", "Modified")
+    ),
+    
+    treatment = factor(
+      treatment,
+      levels = c("30rpm_original", "40rpm_original", "50rpm_original", "60rpm_original",
+                 "40rpm_modified", "50rpm_modified"),
+      labels = c("30 RPM Original", "40 RPM Original", "50 RPM Original", "60 RPM Original",
+                 "40 RPM Modified", "50 RPM Modified")
+    ),
+    roi = factor(
+      roi,
+      levels = c("unlabeled", "nadir", "1s_post"),
+      labels = c("Unlabelled", "Nadir", "Post-nadir")
+    )
+  )
+
+# modify 5 sensors... 
+denver_data <- denver_data %>%
+  filter(
+    # Remove C550327103129 entirely
+    long_id != "C550327103129",
+    # Trim specific sensors
+    !(long_id == "U120327084613" & time > 113.51),
+    !(long_id == "U100327103204" & time > 422),
+    !(long_id == "U160510111356" & time > 85),
+    !(long_id == "U190327103259" & time > 290)
+  )
+
+```
+
+
+Input helper functions 
+
+```{r helper_functions, echo=FALSE, message = FALSE}
+
+# setup custom theme
+theme_custom <- function(base_size=10){ 
+  #base font size set here (10 pt)
+  theme_grey() %+replace%
+    theme(
+      axis.text = element_text(colour="black"),
+      axis.title = element_text(colour="black"),
+      axis.ticks = element_line(colour="black"),
+      panel.border = element_rect(colour = "black", fill=NA),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank(),
+      strip.background = element_rect(colour = "black", fill = NA),
+      panel.spacing.x = unit(12, "pt")
+      #default family = sans (Arial)
+    ) 
+}
+
+```
+
+
+# 2. Exploratory data analysis
+
+All EDA should be provided here. This includes measuring and validating data dimensions e.g., number sensors for each operational scenario, cleaning data including missing and outlier data and project specific conditions, setting definitions for what data is used for downstream analysis, early summarisations and visualizations which lead into later formal analysis
+
+
+E.g., 
+
+```{r data_structure, echo=FALSE, message = FALSE}
+
+#Check unique sensor ID for each treatment
+denver_data %>%
+  group_by(treatment) %>%
+  summarise(
+    unique_long_ids = n_distinct(long_id),
+    .groups = "drop"
+  )
+
+str(denver_data)
+
+colnames(denver_data)
+
+dlookr::plot_outlier(denver_data)
+
+```
+
+## 2.1 Visualise main relationships
+
+
+By plotting the main visual relationships we're able to quickly identify relationships in the data and begin addressing study objectives and hypothesis.
+
+Think of your study objectives.... what do those relationships look like?
+
+E.g.,
+
+```{r}
+
+plot_data_post <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time),
+         mean_strain = round(mean_strain)
+         ) %>%
+  ungroup()
+
+# Get max acceleration points for each sensor
+max_points <- plot_data_post %>%
+  group_by(long_id, treatment) %>%
+  slice_max(order_by = abs(accmag), n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+# accmag_time_plot
+accmag_post_nadir <- ggplot(plot_data_post, aes(x = time_post, y = abs(accmag), group = long_id, color = treatment)) +
+  geom_line(alpha = 0.5, color = "black") +
+  geom_point(data = max_points, alpha = 0.7, size = 2, color = "red2") +
+  facet_wrap(~ treatment, nrow = 1, labeller = labeller(treatment = c(
+    "Original" = "Original Configuration",
+    "Modified" = "Modified Configuration"
+  ))) +
+  labs(
+    x = " Time (s) (ROI 3 Post-nadir)", 
+    y = expression("Acceleration Magnitude (m s" ^-2*")")) +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), expand = c(0,0))+
+  scale_y_continuous(breaks = seq(0, 250, 25), expand= c(0.01,0.01))+
+  theme_custom() +
+  theme(axis.text.x = element_text(angle=90),
+        legend.position = "none")
+
+accmag_post_nadir
+
+```
+
+### 2.1.1 Example passage plot
+
+```{r}
+
+#### Create example passage plot 
+
+C39 <- denver_data %>%
+  filter (long_id == "C390327085054")
+
+# # Plot plotly to identify trim times etc
+# plot_ly(C39, x = ~time) %>%
+#   add_lines(y = ~pres, name = "Pres", line = list(color = "black"), yaxis = "y") %>%
+#   add_lines(y = ~accmag, name = "Acc", line = list(color = "red"), yaxis = "y2") %>%
+#   layout(
+#     xaxis = list(title = "Time (s)"),
+#     yaxis = list(title = "Pressure (kPa)", titlefont = list(color = "black")),
+#     yaxis2 = list(title = "Acceleration Magnitude (g)", titlefont = list(color = "red"),
+#                   overlaying = "y", side = "right")
+#   )
+
+# decided to Trim data again to 106-121
+# ~ 3s plot
+C39 <- C39 %>%
+  filter(time >= 65.598, time <= 69)
+
+# Identify ROI boundaries 
+roi_changes <- C39 %>%
+  mutate(roi_change = roi != lag(roi, default = first(roi))) %>%
+  filter(roi_change) %>%
+  pull(time)
+
+#Identify accmag and pressure min max for secondary axis scaling
+pres_min <- 90
+pres_max <- 120
+accmag_min <- min(C39$accmag)  # approximately -5.809
+accmag_max <- 230
+
+# Calculate scaling to map accmag range onto pressure range
+scale_factor <- (pres_max - pres_min) / (accmag_max - accmag_min)
+offset <- pres_min - accmag_min * scale_factor
+
+
+C39_plot <- ggplot(C39, aes(x = time)) +
+  geom_rect(data = C39 %>%
+              summarise(xmin = min(time), xmax = max(time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "grey90", alpha = 0.1, inherit.aes = FALSE) +
+  geom_rect(data = C39 %>% filter(roi == "Nadir") %>% 
+              summarise(xmin = min(time), xmax = max(time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "#F4A6A3", alpha = 0.1, inherit.aes = FALSE) +
+  geom_rect(data = C39 %>% filter(roi == "Post-nadir") %>% 
+              summarise(xmin = min(time), xmax = max(time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "#A8DADC", alpha = 0.1, inherit.aes = FALSE) +
+  geom_line(aes(y = pres), color = "black", size = 0.5) +
+  geom_line(aes(y = accmag * scale_factor + offset), color = "red2", size = 0.5) +
+  geom_vline(xintercept = roi_changes, color = "blue4", linetype = "dotted") +
+  scale_x_continuous(breaks = seq(65, 69, by = 0.25), expand = c(0,0)) +
+  scale_y_continuous(
+    name = "Pressure (kPa)",
+    breaks = seq(90, 120, by = 2),
+    limits = c(90, 120),
+    sec.axis = sec_axis(
+      ~ (. - offset) / scale_factor, 
+      name = expression("Acceleration Magnitude (m s" ^-2*")"),
+      breaks = seq(0, 230, by = 20)
+    )
+  ) +
+  labs(x = "Time (s)") +
+  theme_custom() +
+  theme(
+    axis.title.y.right = element_text(color = "red2"),
+    axis.text.y.right = element_text(color = "red2"),
+    axis.text.x = element_text(angle = 90)
+  ) +
+  coord_cartesian(clip = "off")
+
+C39_plot
+
+# Export svg for editing in Inkscape. Ensure units are cm and size appropriate for page space. No DPI needed (vector)
+#ggsave("C39_plot.svg", C39_plot, units = "cm", width = 16, height = 10)
+
+# Export png. Ensure units are cm and size appropriate for page space. Set DPI at 300
+#ggsave("C39_plot.png", C39_plot, dpi = 300, units = "cm", width = 16, height = 10)
+
+
+
+```
+
+
+
+
+# 3. Pressure indicators
+
+Data preparation 
+
+```{r pres_prep}
+
+# Filter and shape data accordingly for pressure analysis
+
+
+```
+
+## 3.1 Pressure summary
+
+
+```{r pres_sum}
+
+# Summarise and tabulate pressure variables across treatments etc
+
+
+```
+
+
+## 3.2 Pressure vis
+
+
+```{r pres_vis}
+
+# Build core figures here
+
+
+```
+
+
+
+## 3.3 Pressure analysis
+
+```{r pres_analysis}
+
+# Build core figures here
+
+
+```
+
+
+
+# 4. Acceleration indicators
+
+Data preparation 
+
+```{r acc_prep}
+
+# Filter and shape data accordingly for acceleration analysis
+
+max_accmag_data_nadir <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Nadir") %>%
+  group_by(long_id, ) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_data_nadir <- denver_data %>% 
+  filter(rpm == 50) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_nadir <- plot_data_nadir %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+# Get max accmag for each sensor in Post-nadir ROI
+max_accmag_data_post <- denver_data %>% 
+  filter(rpm == 50) %>%
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+
+plot_data_post <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time),
+         mean_strain = round(mean_strain)
+         ) %>%
+  ungroup()
+
+exceed_data_post <- plot_data_post %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+```
+
+## 4.1 Acceleration summary
+
+
+```{r acc_sum}
+
+# Summarise and tabulate acceleration variables across treatments etc
+
+#e.g.,
+
+#central tendencies
+max_accmag_data_post %>%
+  group_by(configuration) %>%
+  summarise(
+    n = n(),
+    median = median(max_accmag),
+    Q1 = quantile(max_accmag, 0.25),
+    Q3 = quantile(max_accmag, 0.75),
+    IQR = IQR(max_accmag),
+    mean = mean(max_accmag),
+    sd = sd(max_accmag),
+    .groups = "drop"
+  )
+
+
+
+```
+
+
+## 4.2 Acceleration vis
+
+
+```{r acc_vis}
+
+# Build core figures here
+
+n_labels <- max_accmag_data_nadir %>%
+  group_by(configuration) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+max_accmag_boxplot_nadir <- ggplot(max_accmag_data_nadir, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_fill_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_nadir
+
+
+exceedance_plot_nadir <- ggplot(exceed_data_nadir, aes(x = exceed_pct, y = accmag, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+#exceedance_plot_nadir
+
+combined_plot_nadir <-plot_grid(max_accmag_boxplot_nadir, exceedance_plot_nadir,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+#combined_plot_nadir
+
+max_accmag_boxplot_post <- ggplot(max_accmag_data_post, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_fill_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+  #coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_post
+
+exceedance_plot_post <- ggplot(exceed_data_post, aes(x = exceed_pct, y = accmag, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+coord_cartesian(clip = "off")
+
+#exceedance_plot_post
+
+combined_plot_post_nadir <-plot_grid(max_accmag_boxplot_post, exceedance_plot_post,
+                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+combined_plot_post_nadir
+
+#ggsave("combined_plot_post_nadir.svg", combined_plot_post_nadir, units = "cm", width = 16, height = 8)
+
+
+
+
+
+combined_acc_plot <-plot_grid(combined_plot_nadir, combined_plot_post_nadir,
+                                     ncol = 1, nrow = 2, rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+combined_acc_plot
+
+
+ggsave("combined_acc_plot.svg", combined_acc_plot, units = "cm", width = 16, height = 16)
+
+
+```
+
+
+
+## 4.3 Acceleration analysis
+
+```{r acc_analysis}
+
+# Core analysis here
+
+ad.test(
+  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$treatment == "Original"],
+  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$treatment == "Modified"]
+)
+
+wilcox.test(max_accmag ~ configuration, max_accmag_data_nadir)
+
+ad.test(
+  exceed_data_nadir$accmag[exceed_data_nadir$treatment == "Original"],
+  exceed_data_nadir$accmag[exceed_data_nadir$treatment == "Modified"]
+)
+
+
+
+ad.test(
+  max_accmag_data_post$max_accmag[max_accmag_data_post$treatment == "Original"],
+  max_accmag_data_post$max_accmag[max_accmag_data_post$treatment == "Modified"]
+)
+
+wilcox.test(max_accmag ~ configuration, max_accmag_data_post)
+
+ad.test(
+  exceed_data_post$accmag[exceed_data_post$treatment == "Original"],
+  exceed_data_post$accmag[exceed_data_post$treatment == "Modified"]
+)
+
+
+```
+
+
+# 5. Strain indicators
+
+Data preparation 
+
+```{r strain_prep}
+
+# Filter and shape data accordingly for pressure analysis
+
+
+```
+
+## 5.1 Strain summary
+
+
+```{r strain_sum}
+
+# Summarise and tabulate pressure variables across treatments etc
+
+
+```
+
+
+## 5.2 Strain vis
+
+
+```{r strain_vis}
+
+# Build core figures here
+
+
+```
+
+
+
+## 5.3 Strain analysis
+
+```{r strain_analysis}
+
+# Core analysis here
+
+
+```
+
+# 6. Fish survival estimates
+
+
+```{r}
+
+survival_data <- tibble(
+  species = c(
+    "Roach (Rutilus rutilus)",
+    "European eel (Anguilla anguilla) - adult",
+    "European eel (Anguilla anguilla) - juvenile",
+    "Bream (Abramis brama)",
+    "Brown trout (Salmo trutta)"
+  ),
+  total_recap = c(239, 46, 219, 208, 211),
+  total_surv  = c(237, 46, 219, 207, 211),
+  group       = NA,
+  survival    = NA,
+  lower_ci    = NA,
+  upper_ci    = NA
+)
+
+survival__ci <- survival_data %>%
+  mutate(
+    # Calculate survival proportion
+    survival = total_surv / total_recap,
+    # Calculate Wilson CIs
+    ci_result = map2(total_surv, total_recap, 
+                     ~binom.confint(.x, .y, methods = "wilson"))
+  ) %>%
+  unnest(ci_result) %>%
+  select(species, group, total_recap, total_surv, 
+         survival = mean, lower_ci = lower, upper_ci = upper)
+
+# Display results
+print(survival__ci)
+
+```
+
+```{r}
+
+impact_data <- survival__ci %>%
+  mutate(species = factor(species, levels = rev(unique(species))))
+
+p <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
+  annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, 
+           fill = "#ffcccc", alpha = 0.3) +
+  annotate("rect", xmin = 96, xmax = 100, ymin = -Inf, ymax = Inf, 
+           fill = "#ccffcc", alpha = 0.5) +
+  geom_vline(xintercept = c(96, 98, 100), linetype = "dashed", 
+             color = "grey60", linewidth = 0.5) +
+  geom_errorbarh(aes(xmin = lower_ci * 100, xmax = upper_ci * 100), 
+                 height = 0.2, linewidth = 0.5) +
+  geom_point(size = 2, shape = 16) +
+  geom_text(aes(label = paste0("italic(n) == ", total_recap)), 
+            x = 90.5, hjust = 0, size = 3.5, parse = TRUE) +
+  # Top left label
+  annotate("text", x = 90, y = Inf, 
+           label = "CI = 95% (Wilson Binomial)\nMargin = 2%",
+           hjust = 0, vjust = 1, size = 3.5, lineheight = 0.9) +
+  # Labels and theme
+  scale_x_continuous(limits = c(90, 100), 
+                     breaks = seq(90, 100, 1)) +
+  labs(x = "Survival Probability (%)",
+       y = NULL) +
+  theme_custom() +
+  coord_cartesian(clip = "off")
+
+print(p)
+
+ggsave("denver_ci.svg", 
+       plot = p, 
+       width = 18, 
+       height = 10, 
+       units = "cm",
+       bg = "white")
+
+```
+
+
+
