@@ -7,7 +7,43 @@ editor_options:
     wrap: 72
 ---
 
-This markdown file is formatted to be executed with a single run by importing pre-processed BDS sensor data and performing downstream analysis.
+# Introduction
+
+*Go through this analysis and add descriptions, results etc where
+necessary. The document should be able to run visa 'run \> run
+all'.....*
+
+**Transfer from processing stage to analysis stage**
+
+Data used throughout this analysis has been processed using the
+semi-automated analysis script. 'R_BDS_import.R' The script is designed
+to assist the user in processing multiple RAPID data files to extract
+key variables on pressure and acceleration.
+
+**Identification & Basic Info**
+
+-   `long_id`: Unique sensor deployment identifier
+
+-   `treatment`:
+
+-   `time`:
+
+-   `pres`:
+
+-   `accmag`:
+
+-   `mean_strain`:
+
+-   `roi`:
+
+-   `configuration`:
+
+*Detail about any process that creates and shapes the data before this
+analysis....*
+
+This markdown file is formatted to be executed with a single run by
+importing pre-processed BDS sensor data and performing downstream
+analysis.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -37,7 +73,12 @@ library(dlookr)
 
 ## 1.1 Import sensor data
 
-Import and clean pre-processed sensor data. Import data already has 'bed sensors' removed. Some final smaller changes made to data. See comments where necessary. 
+*All processed data files corresponding to each treatment condition are
+stored in....*
+
+Import and clean pre-processed sensor data. Import data already has 'bed
+sensors' removed. Some final smaller changes made to data. See comments
+where necessary.
 
 ```{r data_import, echo=FALSE, message = FALSE}
 
@@ -66,9 +107,11 @@ denver_data <- denver_data %>%
     
     treatment = factor(
       treatment,
-      levels = c("30rpm_original", "40rpm_original", "50rpm_original", "60rpm_original",
+      levels = c("30rpm_original", "40rpm_original",
+                 "50rpm_original", "60rpm_original",
                  "40rpm_modified", "50rpm_modified"),
-      labels = c("30 RPM Original", "40 RPM Original", "50 RPM Original", "60 RPM Original",
+      labels = c("30 RPM Original", "40 RPM Original", 
+                 "50 RPM Original", "60 RPM Original",
                  "40 RPM Modified", "50 RPM Modified")
     ),
     roi = factor(
@@ -92,8 +135,7 @@ denver_data <- denver_data %>%
 
 ```
 
-
-Input helper functions 
+Input helper functions
 
 ```{r helper_functions, echo=FALSE, message = FALSE}
 
@@ -117,13 +159,16 @@ theme_custom <- function(base_size=10){
 
 ```
 
-
 # 2. Exploratory data analysis
 
-All EDA should be provided here. This includes measuring and validating data dimensions e.g., number sensors for each operational scenario, cleaning data including missing and outlier data and project specific conditions, setting definitions for what data is used for downstream analysis, early summarisations and visualizations which lead into later formal analysis
+All EDA should be provided here. This includes measuring and validating
+data dimensions e.g., number sensors for each operational scenario,
+cleaning data including missing and outlier data and project specific
+conditions, setting definitions for what data is used for downstream
+analysis, early summarisations and visualizations which lead into later
+formal analysis
 
-
-E.g., 
+E.g.,
 
 ```{r data_structure, echo=FALSE, message = FALSE}
 
@@ -143,16 +188,18 @@ dlookr::plot_outlier(denver_data)
 
 ```
 
-## 2.1 Visualise main relationships
+## 2.1 Visualize main relationships
 
+By plotting the main visual relationships we're able to quickly identify
+relationships in the data and begin addressing study objectives and
+hypothesis.
 
-By plotting the main visual relationships we're able to quickly identify relationships in the data and begin addressing study objectives and hypothesis.
-
-Think of your study objectives.... what do those relationships look like?
+Think of your study objectives.... what do those relationships look
+like?
 
 E.g.,
 
-```{r}
+```{r accmag_post_nadir}
 
 plot_data_post <- denver_data %>%
   filter(rpm == 50) %>% 
@@ -193,7 +240,7 @@ accmag_post_nadir
 
 ### 2.1.1 Example passage plot
 
-```{r}
+```{r c_39_plot}
 
 #### Create example passage plot 
 
@@ -211,10 +258,11 @@ C39 <- denver_data %>%
 #                   overlaying = "y", side = "right")
 #   )
 
-# decided to Trim data again to 106-121
-# ~ 3s plot
+
+# decided to Trim data
+# 3s plot
 C39 <- C39 %>%
-  filter(time >= 65.598, time <= 69)
+  filter(time >= 66, time <= 69)
 
 # Identify ROI boundaries 
 roi_changes <- C39 %>%
@@ -281,12 +329,12 @@ C39_plot
 
 ```
 
-
+Describe why diagnostics form the plot which lead to further analysis...
 
 
 # 3. Pressure indicators
 
-Data preparation 
+Data preparation
 
 ```{r pres_prep}
 
@@ -297,7 +345,6 @@ Data preparation
 
 ## 3.1 Pressure summary
 
-
 ```{r pres_sum}
 
 # Summarise and tabulate pressure variables across treatments etc
@@ -305,9 +352,7 @@ Data preparation
 
 ```
 
-
 ## 3.2 Pressure vis
-
 
 ```{r pres_vis}
 
@@ -316,22 +361,18 @@ Data preparation
 
 ```
 
-
-
 ## 3.3 Pressure analysis
 
 ```{r pres_analysis}
 
-# Build core figures here
+# Build core analysis here
 
 
 ```
 
-
-
 # 4. Acceleration indicators
 
-Data preparation 
+Describe data preparation...
 
 ```{r acc_prep}
 
@@ -340,7 +381,7 @@ Data preparation
 max_accmag_data_nadir <- denver_data %>%
   filter(rpm == 50) %>% 
   filter(roi == "Nadir") %>%
-  group_by(long_id, ) %>%
+  group_by(long_id, configuration) %>%
   summarise(max_accmag = max(abs(accmag)), .groups = "drop")
 
 plot_data_nadir <- denver_data %>% 
@@ -396,14 +437,12 @@ exceed_data_post <- plot_data_post %>%
 
 ## 4.1 Acceleration summary
 
+Summarise and tabulate acceleration variables across treatments etc
+
+e.g.,central tendencies
 
 ```{r acc_sum}
 
-# Summarise and tabulate acceleration variables across treatments etc
-
-#e.g.,
-
-#central tendencies
 max_accmag_data_post %>%
   group_by(configuration) %>%
   summarise(
@@ -418,12 +457,9 @@ max_accmag_data_post %>%
   )
 
 
-
 ```
 
-
 ## 4.2 Acceleration vis
-
 
 ```{r acc_vis}
 
@@ -540,8 +576,10 @@ max_accmag_boxplot_post <- ggplot(max_accmag_data_post, aes(y = max_accmag)) +
     alpha = 0.4,
     size = 1
   )+
-  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
-  scale_fill_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_color_manual(values = c("Original" = "steelblue4",
+                                "Modified" = "steelblue2")) +
+  scale_fill_manual(values = c("Original" = "steelblue4", 
+                               "Modified" = "steelblue2")) +
   geom_text(
     data = n_labels,
     aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
@@ -589,88 +627,98 @@ coord_cartesian(clip = "off")
 
 #exceedance_plot_post
 
-combined_plot_post_nadir <-plot_grid(max_accmag_boxplot_post, exceedance_plot_post,
-                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
-combined_plot_post_nadir
+combined_plot_post_nadir <-plot_grid(max_accmag_boxplot_post,
+                                     exceedance_plot_post,
+                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4),
+                          align = "h",axis = "tb")
+#combined_plot_post_nadir
 
 #ggsave("combined_plot_post_nadir.svg", combined_plot_post_nadir, units = "cm", width = 16, height = 8)
 
 
 
-
-
-combined_acc_plot <-plot_grid(combined_plot_nadir, combined_plot_post_nadir,
-                                     ncol = 1, nrow = 2, rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+combined_acc_plot <-plot_grid(combined_plot_nadir, 
+                              combined_plot_post_nadir,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
 combined_acc_plot
 
 
-ggsave("combined_acc_plot.svg", combined_acc_plot, units = "cm", width = 16, height = 16)
+ggsave("combined_acc_plot.svg",
+       combined_acc_plot,
+       units = "cm",
+       width = 16,
+       height = 16)
 
 
 ```
 
-
-
 ## 4.3 Acceleration analysis
+
+Non-parametric tests for  differences in median acceleration maxima and kernel density .
 
 ```{r acc_analysis}
 
 # Core analysis here
 
 ad.test(
-  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$treatment == "Original"],
-  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$treatment == "Modified"]
-)
+  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$
+                                     configuration == "Original"],
+  max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$
+                                     configuration == "Modified"]
+  )
 
-wilcox.test(max_accmag ~ configuration, max_accmag_data_nadir)
-
-ad.test(
-  exceed_data_nadir$accmag[exceed_data_nadir$treatment == "Original"],
-  exceed_data_nadir$accmag[exceed_data_nadir$treatment == "Modified"]
-)
-
-
+wilcox.test(max_accmag ~ configuration,
+            max_accmag_data_nadir)
 
 ad.test(
-  max_accmag_data_post$max_accmag[max_accmag_data_post$treatment == "Original"],
-  max_accmag_data_post$max_accmag[max_accmag_data_post$treatment == "Modified"]
-)
-
-wilcox.test(max_accmag ~ configuration, max_accmag_data_post)
+  exceed_data_nadir$accmag[exceed_data_nadir$
+                             configuration == "Original"],
+  exceed_data_nadir$accmag[exceed_data_nadir$
+                             configuration == "Modified"]
+  )
 
 ad.test(
-  exceed_data_post$accmag[exceed_data_post$treatment == "Original"],
-  exceed_data_post$accmag[exceed_data_post$treatment == "Modified"]
-)
+  max_accmag_data_post$max_accmag[max_accmag_data_post$
+                                    configuration == "Original"],
+  max_accmag_data_post$max_accmag[max_accmag_data_post$
+                                    configuration == "Modified"]
+  )
+
+wilcox.test(max_accmag ~ configuration,
+            max_accmag_data_post)
+
+ad.test(
+  exceed_data_post$accmag[exceed_data_post$
+                            configuration == "Original"],
+  exceed_data_post$accmag[exceed_data_post$
+                            configuration == "Modified"]
+  )
 
 
 ```
 
-
 # 5. Strain indicators
 
-Data preparation 
+Data preparation
 
 ```{r strain_prep}
 
-# Filter and shape data accordingly for pressure analysis
+# Filter and shape data accordingly for Strain analysis
 
 
 ```
 
 ## 5.1 Strain summary
 
-
 ```{r strain_sum}
 
-# Summarise and tabulate pressure variables across treatments etc
+# Summarise and tabulate Strain variables across treatments etc
 
 
 ```
 
-
 ## 5.2 Strain vis
-
 
 ```{r strain_vis}
 
@@ -678,8 +726,6 @@ Data preparation
 
 
 ```
-
-
 
 ## 5.3 Strain analysis
 
@@ -692,8 +738,9 @@ Data preparation
 
 # 6. Fish survival estimates
 
+Calculate 95% 'Wilson binomial confidence intervals and build visualization.
 
-```{r}
+```{r fish_survival}
 
 survival_data <- tibble(
   species = c(
@@ -711,9 +758,8 @@ survival_data <- tibble(
   upper_ci    = NA
 )
 
-survival__ci <- survival_data %>%
+survival_ci <- survival_data %>%
   mutate(
-    # Calculate survival proportion
     survival = total_surv / total_recap,
     # Calculate Wilson CIs
     ci_result = map2(total_surv, total_recap, 
@@ -723,17 +769,17 @@ survival__ci <- survival_data %>%
   select(species, group, total_recap, total_surv, 
          survival = mean, lower_ci = lower, upper_ci = upper)
 
-# Display results
-print(survival__ci)
+survival_ci %>% 
+  select(-group)
 
 ```
 
-```{r}
+```{r fish_survival_plot}
 
-impact_data <- survival__ci %>%
+impact_data <- survival_ci %>%
   mutate(species = factor(species, levels = rev(unique(species))))
 
-p <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
+survival_plot <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
   annotate("rect", xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, 
            fill = "#ffcccc", alpha = 0.3) +
   annotate("rect", xmin = 96, xmax = 100, ymin = -Inf, ymax = Inf, 
@@ -745,11 +791,9 @@ p <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
   geom_point(size = 2, shape = 16) +
   geom_text(aes(label = paste0("italic(n) == ", total_recap)), 
             x = 90.5, hjust = 0, size = 3.5, parse = TRUE) +
-  # Top left label
   annotate("text", x = 90, y = Inf, 
            label = "CI = 95% (Wilson Binomial)\nMargin = 2%",
            hjust = 0, vjust = 1, size = 3.5, lineheight = 0.9) +
-  # Labels and theme
   scale_x_continuous(limits = c(90, 100), 
                      breaks = seq(90, 100, 1)) +
   labs(x = "Survival Probability (%)",
@@ -757,16 +801,12 @@ p <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
   theme_custom() +
   coord_cartesian(clip = "off")
 
-print(p)
+survival_plot
 
-ggsave("denver_ci.svg", 
-       plot = p, 
-       width = 18, 
-       height = 10, 
-       units = "cm",
-       bg = "white")
+# ggsave("survival_plot.svg", 
+#        plot = survival_plot, 
+#        width = 18, 
+#        height = 10, 
+#        units = "cm")
 
 ```
-
-
-
