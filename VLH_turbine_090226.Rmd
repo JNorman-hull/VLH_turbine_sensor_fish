@@ -378,6 +378,8 @@ Describe data preparation...
 
 # Filter and shape data accordingly for acceleration analysis
 
+#filter for rpm 50
+
 max_accmag_data_nadir <- denver_data %>%
   filter(rpm == 50) %>% 
   filter(roi == "Nadir") %>%
@@ -433,6 +435,63 @@ exceed_data_post <- plot_data_post %>%
   ) %>%
   ungroup()
 
+
+#filter for rpm 40
+max_accmag_data_nadir_40 <- denver_data %>%
+  filter(rpm == 40) %>% 
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_data_nadir_40 <- denver_data %>% 
+  filter(rpm == 40) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_nadir_40 <- plot_data_nadir_40 %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+# Get max accmag for each sensor in Post-nadir ROI
+max_accmag_data_post_40 <- denver_data %>% 
+  filter(rpm == 40) %>%
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+
+plot_data_post_40 <- denver_data %>%
+  filter(rpm == 40) %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time),
+         mean_strain = round(mean_strain)
+         ) %>%
+  ungroup()
+
+exceed_data_post_40 <- plot_data_post_40 %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
 ```
 
 ## 4.1 Acceleration summary
@@ -464,6 +523,7 @@ max_accmag_data_post %>%
 ```{r acc_vis}
 
 # Build core figures here
+#core figures for 50_O and 50_M
 
 n_labels <- max_accmag_data_nadir %>%
   group_by(configuration) %>%
@@ -653,6 +713,201 @@ ggsave("combined_acc_plot.svg",
 
 ```
 
+
+```{r acc_vis}
+#core figures for 40_O and 40_M
+
+n_labels_40 <- max_accmag_data_nadir_40 %>%
+  group_by(configuration) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+max_accmag_boxplot_nadir_40 <- ggplot(max_accmag_data_nadir_40, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_fill_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_nadir_40
+
+
+exceedance_plot_nadir_40 <- ggplot(exceed_data_nadir_40, aes(x = exceed_pct, y = accmag, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+
+
+#exceedance_plot_nadir_40
+
+combined_plot_nadir_40 <-plot_grid(max_accmag_boxplot_nadir_40, exceedance_plot_nadir_40,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+#combined_plot_nadir_40
+
+max_accmag_boxplot_post_40 <- ggplot(max_accmag_data_post_40, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "steelblue4",
+                                "Modified" = "steelblue2")) +
+  scale_fill_manual(values = c("Original" = "steelblue4", 
+                               "Modified" = "steelblue2")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+  #coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_post_40
+
+exceedance_plot_post_40 <- ggplot(exceed_data_post_40, aes(x = exceed_pct, y = accmag, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+coord_cartesian(clip = "off")
+
+#exceedance_plot_post_40
+
+combined_plot_post_nadir_40 <-plot_grid(max_accmag_boxplot_post_40,
+                                     exceedance_plot_post_40,
+                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4),
+                          align = "h",axis = "tb")
+
+#combined_plot_post_nadir_40
+
+#ggsave("combined_plot_post_nadir.svg", combined_plot_post_nadir, units = "cm", width = 16, height = 8)
+
+
+
+combined_acc_plot_40 <-plot_grid(combined_plot_nadir_40, 
+                              combined_plot_post_nadir_40,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+combined_acc_plot_40
+
+
+ggsave("combined_acc_plot_40.svg",
+       combined_acc_plot_40,
+       units = "cm",
+       width = 16,
+       height = 16)
+
+
+```
+
 ## 4.3 Acceleration analysis
 
 Non-parametric tests for  differences in median acceleration maxima and kernel density .
@@ -661,6 +916,7 @@ Non-parametric tests for  differences in median acceleration maxima and kernel d
 
 # Core analysis here
 
+#analysis of 50_O vs 50_M
 ad.test(
   max_accmag_data_nadir$max_accmag[max_accmag_data_nadir$
                                      configuration == "Original"],
@@ -697,6 +953,370 @@ ad.test(
 
 
 ```
+```{r acc_analysis}
+
+
+#analysis of 40_O vs 40_M
+ad.test(
+  max_accmag_data_nadir_40$max_accmag[max_accmag_data_nadir_40$
+                                     configuration == "Original"],
+  max_accmag_data_nadir_40$max_accmag[max_accmag_data_nadir_40$
+                                     configuration == "Modified"]
+  )
+
+wilcox.test(max_accmag ~ configuration,
+            max_accmag_data_nadir_40)
+
+ad.test(
+  exceed_data_nadir_40$accmag[exceed_data_nadir_40$
+                             configuration == "Original"],
+  exceed_data_nadir_40$accmag[exceed_data_nadir_40$
+                             configuration == "Modified"]
+  )
+
+ad.test(
+  max_accmag_data_post_40$max_accmag[max_accmag_data_post_40$
+                                    configuration == "Original"],
+  max_accmag_data_post_40$max_accmag[max_accmag_data_post_40$
+                                    configuration == "Modified"]
+  )
+
+wilcox.test(max_accmag ~ configuration,
+            max_accmag_data_post_40)
+
+ad.test(
+  exceed_data_post_40$accmag[exceed_data_post_40$
+                            configuration == "Original"],
+  exceed_data_post_40$accmag[exceed_data_post_40$
+                            configuration == "Modified"]
+  )
+
+
+
+```
+
+
+## 4.4 Acceleration indicators between 40_M and 50_M
+```{r acc_prep}
+
+# Filter and shape data accordingly for acceleration analysis
+
+max_accmag_data_mod_nadir <- denver_data %>%
+  filter(rpm %in% c(40,50),
+         configuration == "Modified") %>% 
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration, rpm) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_data_mod_nadir <- denver_data %>% 
+  filter(rpm %in% c(40,50),
+         configuration == "Modified") %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration, rpm) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_mod_nadir <- plot_data_mod_nadir %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(rpm, configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+# Get max accmag for each sensor in Post-nadir ROI
+max_accmag_data_mod_post <- denver_data %>% 
+  filter(rpm %in% c(40,50),
+         configuration == "Modified") %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration, rpm) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+
+plot_data_mod_post <- denver_data %>%
+  filter(rpm %in% c(40,50),
+         configuration == "Modified") %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration, rpm) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time),
+         mean_strain = round(mean_strain)
+         ) %>%
+  ungroup()
+
+exceed_data_mod_post <- plot_data_mod_post %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(rpm, configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+max_accmag_data_mod_nadir <- max_accmag_data_mod_nadir %>%
+  dplyr::mutate(rpm = factor(rpm, levels = c(40, 50), labels = c("40", "50")))
+
+exceed_data_mod_nadir <- exceed_data_mod_nadir %>%
+  dplyr::mutate(rpm = factor(rpm, levels = c(40, 50), labels = c("40", "50")))
+
+max_accmag_data_mod_post <- max_accmag_data_mod_post %>%
+  dplyr::mutate(rpm = factor(rpm, levels = c(40, 50), labels = c("40", "50")))
+
+exceed_data_mod_post <- exceed_data_mod_post %>%
+  dplyr::mutate(rpm = factor(rpm, levels = c(40, 50), labels = c("40", "50")))
+
+
+
+```
+
+## 4.5 Acceleration 40_M vs 50_M vis
+
+```{r acc_40_50_mod_vis}
+
+# Build core figures here
+
+n_mod_labels <- max_accmag_data_mod_nadir %>%
+  group_by(rpm) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+max_accmag_boxplot_mod_nadir <- ggplot(max_accmag_data_mod_nadir, aes(y = max_accmag))+
+  stat_halfeye(
+    aes(fill = rpm),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = rpm),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = rpm,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("40" = "red1", "50" = "pink4")) +
+  scale_fill_manual(values = c("40" = "red1", "50" = "pink4")) +
+  geom_text(
+    data = n_mod_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~rpm,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(rpm = c(
+      "40" = "40 RPM Modified Configuration",
+      "50" = "50 RPM Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+
+#max_accmag_boxplot_mod_nadir
+
+
+exceedance_plot_mod_nadir <- ggplot(exceed_data_mod_nadir, aes(x = exceed_pct, y = accmag, group = rpm)) +
+  geom_line(aes(color = rpm, linetype = rpm), linewidth = 1) +
+  scale_color_manual(values = c("40" = "red1", "50" = "pink4")) +
+  scale_linetype_manual(values = c("40" = "solid", "50" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+#exceedance_plot_nadir
+
+combined_plot_mod_nadir <-plot_grid(max_accmag_boxplot_mod_nadir, exceedance_plot_mod_nadir,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+#combined_plot_mod_nadir
+
+max_accmag_boxplot_mod_post <- ggplot(max_accmag_data_mod_post, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = rpm),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = rpm),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = rpm,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("40" = "steelblue4",
+                                "50" = "steelblue2")) +
+  scale_fill_manual(values = c("40" = "steelblue4", 
+                               "50" = "steelblue2")) +
+  geom_text(
+    data = n_mod_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~rpm,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(rpm = c(
+      "40" = "40 RPM Modified Configuration",
+      "50" = "50 RPM Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+  #coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_mod_post
+
+exceedance_plot_mod_post <- ggplot(exceed_data_mod_post, aes(x = exceed_pct, y = accmag, group = rpm)) +
+  geom_line(aes(color = rpm, linetype = rpm), linewidth = 1) +
+  scale_color_manual(values = c("40" = "steelblue4", "50" = "steelblue2")) +
+  scale_linetype_manual(values = c("40" = "solid", "50" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+coord_cartesian(clip = "off")
+
+#exceedance_plot_mod_post
+
+combined_plot_mod_post_nadir <-plot_grid(max_accmag_boxplot_mod_post,
+                                     exceedance_plot_mod_post,
+                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4),
+                          align = "h",axis = "tb")
+#combined_plot_post_nadir
+
+#ggsave("combined_plot_post_nadir.svg", combined_plot_post_nadir, units = "cm", width = 16, height = 8)
+
+
+
+combined_acc_plot_mod <-plot_grid(combined_plot_mod_nadir, 
+                              combined_plot_mod_post_nadir,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+combined_acc_plot_mod
+
+
+ggsave("combined_acc_plot_mod.svg",
+       combined_acc_plot_mod,
+       units = "cm",
+       width = 16,
+       height = 16)
+
+```
+
+
+## 4.6 Acceleration analysis of 40_M vs 50_M
+
+Non-parametric tests for  differences in median acceleration maxima and kernel density .
+
+```{r acc_analysis}
+
+# Core analysis here
+
+ad.test(
+  max_accmag_data_mod_nadir$max_accmag[max_accmag_data_mod_nadir$
+                                     rpm == "40"],
+  max_accmag_data_mod_nadir$max_accmag[max_accmag_data_mod_nadir$
+                                     rpm == "50"]
+  )
+
+wilcox.test(max_accmag ~ rpm,
+            max_accmag_data_mod_nadir)
+
+ad.test(
+  exceed_data_mod_nadir$accmag[exceed_data_mod_nadir$
+                             rpm == "40"],
+  exceed_data_mod_nadir$accmag[exceed_data_mod_nadir$
+                             rpm == "50"]
+  )
+
+ad.test(
+  max_accmag_data_mod_post$max_accmag[max_accmag_data_mod_post$
+                                    rpm == "40"],
+  max_accmag_data_mod_post$max_accmag[max_accmag_data_mod_post$
+                                    rpm == "50"]
+  )
+
+wilcox.test(max_accmag ~ rpm,
+            max_accmag_data_mod_post)
+
+ad.test(
+  exceed_data_mod_post$accmag[exceed_data_mod_post$
+                            rpm == "40"],
+  exceed_data_mod_post$accmag[exceed_data_mod_post$
+                            rpm == "50"]
+  )
+
+
+```
+
 
 # 5. Strain indicators
 
@@ -708,6 +1328,8 @@ Data preparation
 
 
 ```
+
+
 
 ## 5.1 Strain summary
 
