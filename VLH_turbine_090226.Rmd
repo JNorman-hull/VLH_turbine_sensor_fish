@@ -339,6 +339,59 @@ Data preparation
 ```{r pres_prep}
 
 # Filter and shape data accordingly for pressure analysis
+#find nadir pressure time and row index 
+
+nadir_tbl <- denver_data %>%
+  mutate(row_index = row_number()) %>%          # index in the full table
+  filter(roi == "Nadir", !is.na(pres), !is.na(time)) %>%
+  group_by(long_id, treatment) %>%
+  slice_min(order_by = pres, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    long_id,
+    treatment,
+    nadir = pres,
+    nadir_time = time
+  )
+
+
+
+#find maximum pressure within 1s before nadir pressure for every sensor per treatment
+max_pres_before_nadir <- denver_data %>%
+  mutate(row_index = row_number()) %>%
+  inner_join(nadir_tbl, by = c("long_id", "treatment")) %>%
+  group_by(long_id, treatment, nadir, nadir_time) %>%
+  # keep only samples in [nadir_time - 1, nadir_time)
+  filter(!is.na(time), !is.na(pres),
+         time >= (nadir_time - 1),
+         time < nadir_time) %>%
+  # take the row with maximum pressure in that window
+  slice_max(order_by = pres, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    long_id, treatment,
+    nadir, nadir_time, 
+    max_p_1s_nadir = pres,
+    max_p_1s_nadir_time = time
+  )
+
+# calculating rate pressure change (rpc) and log ration pressure change (lrpc)
+#setting surface acclimation pressure to 100 kPa (at 0m)
+acclim_press <- 100
+
+pressure_tbl <- max_pres_before_nadir %>%
+  mutate(
+    rate_pc  = max_p_1s_nadir - nadir,
+    ratio_pc = acclim_press/ nadir,
+    log_rpc  = log(ratio_pc)
+  ) %>%
+  transmute(long_id, treatment, nadir, rate_pc, ratio_pc, log_rpc)
+
+
+#filter out extreme outliers
+pressure_tbl_2<-pressure_tbl %>%
+  filter(!is.na(log_rpc), log_rpc <= 3)%>%
+  filter(nadir >= 25)
 
 
 ```
@@ -349,6 +402,37 @@ Data preparation
 
 # Summarise and tabulate pressure variables across treatments etc
 
+summary_pres_tbl <- pressure_tbl_2 %>%
+  group_by(treatment) %>%
+  summarise(
+    n = n(),
+    across(
+      c(nadir, rate_pc, ratio_pc, log_rpc),
+      list(
+        median = ~ median(.x, na.rm = TRUE),
+        mean   = ~ mean(.x, na.rm = TRUE),
+        Q1     = ~ quantile(.x, 0.25, na.rm = TRUE),
+        Q3     = ~ quantile(.x, 0.75, na.rm = TRUE),
+        IQR    = ~ IQR(.x, na.rm = TRUE),
+        sd     = ~ sd(.x, na.rm = TRUE),
+        min    = ~ min(.x, na.rm = TRUE),
+        max    = ~ max(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    -treatment,
+    names_to = "variable_stat",
+    values_to = "value"
+  ) %>%
+  pivot_wider(
+    names_from = treatment,
+    values_from = value
+  )
+
+summary_pres_tbl
 
 ```
 
@@ -357,8 +441,123 @@ Data preparation
 ```{r pres_vis}
 
 # Build core figures here
+nadir_plot<-ggplot(pressure_tbl_2, aes(x = treatment, y = nadir)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 50, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = "a)", hjust = -0.2, vjust = 1.2, size = 3.5) +
+  scale_x_discrete(labels = c(
+    "30 RPM Original" = "30",
+    "40 RPM Original" = "40",
+    "50 RPM Original" = "50",
+    "60 RPM Original" = "60",
+    "40 RPM Modified" = "40",
+    "50 RPM Modified" = "50"
+  )) +
+  # put group labels roughly under the middle of each block
+  annotate("text", x = 2.5, y = -Inf, label = "O", vjust = 2.7, size = 4) +
+  annotate("text", x = 5.5, y = -Inf, label = "M", vjust = 2.7, size = 4) +
+  theme_minimal() +
+  theme_custom() +
+   theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = "Nadir pressure (kPa)") +
+  scale_y_continuous(limits =c(50,105),
+                     breaks = seq(50, 100, 10)) +
+  coord_cartesian( clip = "off")
+ 
+#nadir_plot
 
 
+rpc_plot <- ggplot(pressure_tbl_2, aes(x = treatment, y = rate_pc)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4,# outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 550, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = "b)", hjust = -0.2, vjust = 1.2, size = 3.5) +
+  scale_x_discrete(labels = c(
+    "30 RPM Original" = "30",
+    "40 RPM Original" = "40",
+    "50 RPM Original" = "50",
+    "60 RPM Original" = "60",
+    "40 RPM Modified" = "40",
+    "50 RPM Modified" = "50"
+  )) +
+  # put group labels roughly under the middle of each block
+  annotate("text", x = 2.5, y = -Inf, label = "O", vjust = 2.7, size = 4) +
+  annotate("text", x = 5.5, y = -Inf, label = "M", vjust = 2.7, size = 4) +
+    theme_minimal() +
+  theme_custom() +
+  theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = expression("Rate pressure change (kPa s"^-1*")")) +
+  scale_y_continuous(breaks = seq(0, 560, 50)) +
+  #scale_y_break(c(55, 500), scales = 0.6) +
+  coord_cartesian(clip = "off")
+
+#rpc_plot
+
+
+lrpc_plot <- ggplot(pressure_tbl_2, aes(x = treatment, y = log_rpc)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,     # "x"
+               outlier.size = 0.9 ,outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 0.5, colour = "red", linetype = "dashed",  linewidth = 0.5)+
+  #theme_minimal() +
+  annotate(
+    "text",
+    x = -Inf,
+    y = Inf,
+    label = "c)",
+    hjust = -0.2,
+    vjust = 1.2,
+    size = 3.5
+  ) +
+  labs(#title = "log_RPC by RPM Scenario",
+    x = NULL,
+    y = "Log ratio pressure change")+
+  scale_x_discrete(labels = c(
+     "30 RPM Original" = "30",
+    "40 RPM Original" = "40",
+    "50 RPM Original" = "50",
+    "60 RPM Original" = "60",
+    "40 RPM Modified" = "40",
+    "50 RPM Modified" = "50"
+  )) +
+  # put group labels roughly under the middle of each block
+  annotate("text", x = 2.5, y = -Inf, label = "O", vjust = 2.7, size = 4) +
+  annotate("text", x = 5.5, y = -Inf, label = "M", vjust = 2.7, size = 4) +
+  theme_custom() +
+ # theme(
+    # text = element_text(family = base_family, size = base_size),
+    # axis.title = element_text(size = base_size),
+    # axis.text  = element_text(size = base_size),
+    #axis.text.x = element_text(angle = 65, hjust = 2)
+  #)+
+  scale_y_continuous(limits = c(0,0.55),
+                     breaks = seq(0, 0.55, 0.1)) +
+  coord_cartesian( clip = "off")
+
+
+#lrpc_plot
+
+
+pres_plots <- plot_grid(nadir_plot, rpc_plot, lrpc_plot,
+                        ncol = 3, nrow = 1)
+
+pres_plots
+
+#ggsave(filename = "pres_plots.svg", plot = pres_plots,
+#       device = "svg", units = "cm", width = 16, height = 8, dpi = 300)
 ```
 
 ## 3.3 Pressure analysis
@@ -366,8 +565,14 @@ Data preparation
 ```{r pres_analysis}
 
 # Build core analysis here
+kruskal.test(nadir ~ treatment,
+             data = pressure_tbl_2)
 
+kruskal.test(rate_pc~ treatment,
+             data = pressure_tbl_2)
 
+kruskal.test(log_rpc~ treatment,
+             data = pressure_tbl_2)
 ```
 
 # 4. Acceleration indicators
@@ -1325,8 +1530,113 @@ Data preparation
 ```{r strain_prep}
 
 # Filter and shape data accordingly for Strain analysis
+#filter for nadir and post-nadir region for general boxplots of all treatment groups
+
+strain_data_nadir <- denver_data %>%
+  #filter(rpm == 50) %>% 
+  filter(roi == "Nadir") %>%
+   group_by(long_id, treatment, configuration) %>%
+  summarise(mean_mean_strain = mean(mean_strain), .groups = "drop")
+
+strain_data_post_nadir <- denver_data %>%
+  #filter(rpm == 50) %>% 
+  filter(roi == "Post-nadir") %>%
+   group_by(long_id, treatment, configuration) %>%
+  summarise(mean_mean_strain = mean(mean_strain), .groups = "drop")
 
 
+
+#comparison of 50_M vs 50_O data preparation mean strain
+
+strain_data_nadir_50 <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(mean_mean_strain = mean(mean_strain), .groups = "drop")
+
+plot_data_nadir <- denver_data %>% 
+  filter(rpm == 50) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_nadir_strain_50 <- plot_data_nadir %>%
+  #filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(mean_strain, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(mean_strain),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+strain_data_post_nadir_50 <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(mean_mean_strain = mean(mean_strain), .groups = "drop")
+
+
+
+exceed_data_post_nadir_strain_50 <- plot_data_post %>%
+  #filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(mean_strain, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(mean_strain),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+
+#comparison of 50_M vs 50_O data preparation max strain
+
+max_strain_data_nadir_50 <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(max_mean_strain = max(mean_strain), .groups = "drop")
+
+plot_data_nadir <- denver_data %>% 
+  filter(rpm == 50) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_nadir_strain_50 <- plot_data_nadir %>%
+  #filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(mean_strain, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(mean_strain),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+max_strain_data_post_nadir_50 <- denver_data %>%
+  filter(rpm == 50) %>% 
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, configuration) %>%
+  summarise(max_mean_strain = max(mean_strain), .groups = "drop")
+
+
+
+exceed_data_post_nadir_strain_50 <- plot_data_post %>%
+  #filter(accmag > 10) %>%
+  group_by(configuration) %>%
+  arrange(mean_strain, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(mean_strain),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
 ```
 
 
@@ -1338,6 +1648,23 @@ Data preparation
 # Summarise and tabulate Strain variables across treatments etc
 
 
+strain_data_nadir_50 %>%
+  group_by(configuration) %>%
+  summarise(
+    n = n(),
+    median = median(mean_mean_strain),
+    Q1 = quantile(mean_mean_strain, 0.25),
+    Q3 = quantile(mean_mean_strain, 0.75),
+    IQR = IQR(mean_mean_strain),
+    mean = mean(mean_mean_strain),
+    sd = sd(mean_mean_strain),
+    min= min(mean_mean_strain),
+    max = max(mean_mean_strain),
+    .groups = "drop"
+  )
+
+
+
 ```
 
 ## 5.2 Strain vis
@@ -1346,15 +1673,471 @@ Data preparation
 
 # Build core figures here
 
+#all treatments boxplot nadir region
+mean_strain_nadir_plot<-ggplot(strain_data_nadir, aes(x = treatment, y = mean_mean_strain, color = configuration)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  #geom_hline(yintercept = 500, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  #annotate("text", x = -Inf, y = Inf, label = "a)", hjust = -0.2, vjust = 1.2, size = 3.5) #+
+  scale_x_discrete(labels = c(
+    "30 RPM Original" = "30",
+    "40 RPM Original" = "40",
+    "50 RPM Original" = "50",
+    "60 RPM Original" = "60",
+    "40 RPM Modified" = "40",
+    "50 RPM Modified" = "50"
+  )) +
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  #scale_color_manual(values = c(Original = "red1", Modified = "pink4"))+
+  # put group labels roughly under the middle of each block
+  annotate("text", x = 2.5, y = -Inf, label = "O", vjust = 2.7, size = 4) +
+  annotate("text", x = 5.5, y = -Inf, label = "M", vjust = 2.7, size = 4) +
+  theme_minimal() +
+  theme_custom() +
+   theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = "Mean strain rate (l s-1)") +
+  scale_y_continuous(limits =c(0,5000),
+                     breaks = seq(0, 5000, 500)) +
+  coord_cartesian( clip = "off")
 
+#mean_strain_nadir_plot
+
+
+#all treatments boxplots post-nadir region
+mean_strain_post_nadir_plot<-ggplot(strain_data_post_nadir, aes(x = treatment, y = mean_mean_strain, color = configuration)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  #geom_hline(yintercept = 500, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  #annotate("text", x = -Inf, y = Inf, label = "a)", hjust = -0.2, vjust = 1.2, size = 3.5) #+
+  scale_x_discrete(labels = c(
+    "30 RPM Original" = "30",
+    "40 RPM Original" = "40",
+    "50 RPM Original" = "50",
+    "60 RPM Original" = "60",
+    "40 RPM Modified" = "40",
+    "50 RPM Modified" = "50"
+  )) +
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  # put group labels roughly under the middle of each block
+  annotate("text", x = 2.5, y = -Inf, label = "O", vjust = 2.7, size = 4) +
+  annotate("text", x = 5.5, y = -Inf, label = "M", vjust = 2.7, size = 4) +
+  theme_minimal() +
+  theme_custom() +
+   theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = "Mean strain rate (l s-1)") +
+  scale_y_continuous(limits =c(0,5000),
+                     breaks = seq(0, 5000, 500)) +
+  coord_cartesian( clip = "off")
+
+#mean_strain_post_nadir_plot
+
+
+
+
+combined_boxplot_strain<-plot_grid(mean_strain_nadir_plot, mean_strain_post_nadir_plot,
+                                ncol = 2, nrow = 1, rel_widths = c(0.5,0.5), align = "h",axis = "tb")
+
+
+combined_boxplot_strain
 ```
+
+
+```{r strain_vis}
+# figures for comparison of mean strain 50_M vs 50_O
+
+n_labels <- strain_data_nadir_50 %>%
+  group_by(configuration) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+strain_boxplot_nadir <- ggplot(strain_data_nadir_50, aes(y = mean_mean_strain)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_fill_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 4000)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Mean strain rate (l s"^-1*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 5000, 500), limits = c(0,5000)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+strain_boxplot_nadir
+
+exceedance_plot_nadir_strain <- ggplot(exceed_data_nadir_strain_50, aes(x = exceed_pct, y = mean_strain, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 5000, 500), limits = c(0, 5000)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Mean strain rate (l s"^-1*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+#exceedance_plot_nadir_strain
+
+combined_plot_nadir_strain <-plot_grid(strain_boxplot_nadir, exceedance_plot_nadir_strain,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+
+
+strain_boxplot_post_nadir <- ggplot(strain_data_post_nadir_50, aes(y = mean_mean_strain)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_fill_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 4000)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Mean strain rate (l s"^-1*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 5000, 500), limits = c(0,5000)) +
+  theme_custom() +
+   theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+#coord_cartesian(clip = "off")
+
+
+exceedance_plot_post_nadir_strain <- ggplot(exceed_data_post_nadir_strain_50, aes(x = exceed_pct, y = mean_strain, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 5000, 500), limits = c(0, 5000)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Mean strain rate (l s"^-1*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+  coord_cartesian(clip = "off")
+
+
+
+combined_plot_post_nadir_strain <-plot_grid(strain_boxplot_post_nadir, exceedance_plot_post_nadir_strain,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+
+
+
+combined_strain_plot_50 <-plot_grid(combined_plot_nadir_strain , 
+                              combined_plot_post_nadir_strain ,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+
+combined_strain_plot_50
+```
+```{r strain_vis}
+# figures for comparison of max strain 50_M vs 50_O
+
+n_labels <- strain_data_nadir_50 %>%
+  group_by(configuration) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+max_strain_boxplot_nadir <- ggplot(max_strain_data_nadir_50, aes(y = max_mean_strain)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_fill_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 25000)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Mean strain rate (l s"^-1*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0,30000)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+#max_strain_boxplot_nadir
+
+exceedance_plot_nadir_max_strain <- ggplot(exceed_data_nadir_strain_50, aes(x = exceed_pct, y = mean_strain, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0, 30000)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Mean strain rate (l s"^-1*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+#exceedance_plot_nadir_strain
+
+combined_plot_nadir_max_strain <-plot_grid(max_strain_boxplot_nadir, exceedance_plot_nadir_max_strain,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+
+
+max_strain_boxplot_post_nadir <- ggplot(max_strain_data_post_nadir_50, aes(y = max_mean_strain)) +
+  stat_halfeye(
+    aes(fill = configuration),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = configuration),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = configuration,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_fill_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 25000)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~configuration,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(configuration = c(
+      "Original" = "Original Configuration",
+      "Modified" = "Modified Configuration"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Mean strain rate (l s"^-1*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0,30000)) +
+  theme_custom() +
+   theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+#coord_cartesian(clip = "off")
+
+
+exceedance_plot_post_nadir_max_strain <- ggplot(exceed_data_post_nadir_strain_50, aes(x = exceed_pct, y = mean_strain, group = configuration)) +
+  geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
+  scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0, 30000)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Mean strain rate (l s"^-1*")"),
+    color = "Treatment"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+  coord_cartesian(clip = "off")
+
+
+
+combined_plot_post_nadir_max_strain <-plot_grid(max_strain_boxplot_post_nadir, exceedance_plot_post_nadir_max_strain,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+
+
+
+combined_max_strain_plot_50 <-plot_grid(combined_plot_nadir_max_strain , 
+                              combined_plot_post_nadir_max_strain ,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+
+combined_max_strain_plot_50
+```
+
 
 ## 5.3 Strain analysis
 
 ```{r strain_analysis}
 
 # Core analysis here
+kruskal.test(mean_mean_strain ~ treatment,
+             data = strain_data_nadir)
 
+
+
+kruskal.test(mean_mean_strain ~ treatment,
+             data = strain_data_post_nadir)
+
+
+ad.test(
+  strain_data_nadir_50$mean_mean_strain[strain_data_nadir_50$
+                                     configuration == "Original"],
+ strain_data_nadir_50$mean_mean_strain[strain_data_nadir_50$
+                                     configuration== "Modified"]
+  )
+
+wilcox.test(mean_mean_strain ~ configuration,
+            strain_data_nadir_50)
+
+
+
+
+ad.test(
+  strain_data_post_nadir_50$mean_mean_strain[strain_data_post_nadir_50$
+                                     configuration == "Original"],
+ strain_data_post_nadir_50$mean_mean_strain[strain_data_post_nadir_50$
+                                     configuration== "Modified"]
+  )
+
+wilcox.test(mean_mean_strain ~ configuration,
+           strain_data_post_nadir_50)
 
 ```
 
