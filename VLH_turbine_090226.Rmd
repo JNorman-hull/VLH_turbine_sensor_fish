@@ -2741,7 +2741,7 @@ duration_boxplot_2 <- ggplot(passage_duration,
   theme_custom()+
   theme(legend.position = "none")
 
-#duration_boxplot_2
+duration_boxplot_2
 
 
 zero_crossings_boxplot_2 <- ggplot(zero_crossings,
@@ -2774,18 +2774,22 @@ mean_ODBA_boxplot_2 <- ggplot(ODBA_roi1,
 #mean_ODBA_boxplot_2
 
 
-backpack_vis_2 <- plot_grid(duration_boxplot_2, zero_crossings_boxplot_2, 
-                        ncol = 2, nrow = 1)
+#backpack_vis_2 <- plot_grid(duration_boxplot_2, zero_crossings_boxplot_2, 
+#                        ncol = 2, nrow = 1)
 
-backpack_vis_2
+#backpack_vis_2
 
 
 
-#ggsave("backpack_vis_2.svg",
-     #  backpack_vis_2,
+#ggsave("duration_boxplot_2.svg",
+     #  duration_boxplot_2,
      # units = "cm",
      #  width = 16,
       # height = 16)
+
+
+
+
 ```
 ##7.10 backpack comparison BDS data analysis
 
