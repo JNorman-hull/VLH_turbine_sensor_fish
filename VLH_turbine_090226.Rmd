@@ -953,7 +953,7 @@ max_accmag_boxplot_nadir_40 <- ggplot(max_accmag_data_nadir_40, aes(y = max_accm
   scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
   scale_fill_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
   geom_text(
-    data = n_labels,
+    data = n_labels_40,
     aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
   )+
   coord_flip() +
@@ -970,7 +970,7 @@ max_accmag_boxplot_nadir_40 <- ggplot(max_accmag_data_nadir_40, aes(y = max_accm
     x = "Kernel Density",
     y = expression("Max Acceleration Magnitude (m s"^-2*")")
   ) +
-  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  scale_y_continuous(breaks = seq(0, 280, 25), limits = c(0,280)) +
   theme_custom() +
   theme(legend.position = "none",
         strip.background = element_blank(),
@@ -987,7 +987,7 @@ exceedance_plot_nadir_40 <- ggplot(exceed_data_nadir_40, aes(x = exceed_pct, y =
   geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
   scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
   scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
-  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_y_continuous(breaks = seq(0, 280, 25), limits = c(0, 280)) +
   scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
   labs(
     x = "Percentage Exceedance (%)",
@@ -1038,7 +1038,7 @@ max_accmag_boxplot_post_40 <- ggplot(max_accmag_data_post_40, aes(y = max_accmag
   scale_fill_manual(values = c("Original" = "steelblue4", 
                                "Modified" = "steelblue2")) +
   geom_text(
-    data = n_labels,
+    data = n_labels_40,
     aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
   )+
   coord_flip() +
@@ -1055,7 +1055,7 @@ max_accmag_boxplot_post_40 <- ggplot(max_accmag_data_post_40, aes(y = max_accmag
     x = "Kernel Density",
     y = expression("Max Acceleration Magnitude (m s"^-2*")")
   ) +
-  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  scale_y_continuous(breaks = seq(0, 280, 25), limits = c(0,280)) +
   theme_custom() +
   theme(legend.position = "none",
         strip.background = element_blank(),
@@ -1070,7 +1070,7 @@ exceedance_plot_post_40 <- ggplot(exceed_data_post_40, aes(x = exceed_pct, y = a
   geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
   scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
   scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
-  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_y_continuous(breaks = seq(0, 280, 25), limits = c(0, 280)) +
   scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
   labs(
     x = "Percentage Exceedance (%)",
