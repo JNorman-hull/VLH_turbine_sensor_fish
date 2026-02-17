@@ -681,9 +681,7 @@ plot_data_post_40 <- denver_data %>%
   filter(roi == "Post-nadir") %>%
   group_by(long_id, configuration) %>%
   arrange(time, .by_group = TRUE) %>%
-  mutate(time_post = time - min(time),
-         mean_strain = round(mean_strain)
-         ) %>%
+  mutate(time_post = time - min(time)) %>%
   ungroup()
 
 exceed_data_post_40 <- plot_data_post_40 %>%
@@ -909,11 +907,11 @@ combined_acc_plot <-plot_grid(combined_plot_nadir,
 combined_acc_plot
 
 
-ggsave("combined_acc_plot.svg",
-       combined_acc_plot,
-       units = "cm",
-       width = 16,
-       height = 16)
+#ggsave("combined_acc_plot.svg",
+     #  combined_acc_plot,
+      # units = "cm",
+      # width = 16,
+      # height = 16)
 
 
 ```
@@ -1104,11 +1102,11 @@ combined_acc_plot_40 <-plot_grid(combined_plot_nadir_40,
 combined_acc_plot_40
 
 
-ggsave("combined_acc_plot_40.svg",
-       combined_acc_plot_40,
-       units = "cm",
-       width = 16,
-       height = 16)
+#ggsave("combined_acc_plot_40.svg",
+      # combined_acc_plot_40,
+      # units = "cm",
+      # width = 16,
+      # height = 16)
 
 
 ```
@@ -1468,11 +1466,11 @@ combined_acc_plot_mod <-plot_grid(combined_plot_mod_nadir,
 combined_acc_plot_mod
 
 
-ggsave("combined_acc_plot_mod.svg",
-       combined_acc_plot_mod,
-       units = "cm",
-       width = 16,
-       height = 16)
+#ggsave("combined_acc_plot_mod.svg",
+     #  combined_acc_plot_mod,
+     # units = "cm",
+     #  width = 16,
+      # height = 16)
 
 ```
 
@@ -1751,6 +1749,16 @@ combined_boxplot_strain<-plot_grid(mean_strain_nadir_plot, mean_strain_post_nadi
 
 
 combined_boxplot_strain
+
+
+
+#ggsave("combined_boxplot_strain.svg",
+     #  combined_boxplot_strain,
+     # units = "cm",
+     #  width = 16,
+      # height = 16)
+
+
 ```
 
 
@@ -1817,7 +1825,7 @@ strain_boxplot_nadir <- ggplot(strain_data_nadir_50, aes(y = mean_mean_strain)) 
   )
 #coord_cartesian(clip = "off")
 
-strain_boxplot_nadir
+#strain_boxplot_nadir
 
 exceedance_plot_nadir_strain <- ggplot(exceed_data_nadir_strain_50, aes(x = exceed_pct, y = mean_strain, group = configuration)) +
   geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
@@ -1926,6 +1934,14 @@ combined_strain_plot_50 <-plot_grid(combined_plot_nadir_strain ,
                               rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
 
 combined_strain_plot_50
+
+
+#ggsave("combined_strain_plot_50.svg",
+     #  combined_strain_plot_50,
+     # units = "cm",
+     #  width = 16,
+      # height = 16)
+
 ```
 ```{r strain_vis}
 # figures for comparison of max strain 50_M vs 50_O
@@ -1980,7 +1996,7 @@ max_strain_boxplot_nadir <- ggplot(max_strain_data_nadir_50, aes(y = max_mean_st
     x = "Kernel Density",
     y = expression("Mean strain rate (l s"^-1*")")
   ) +
-  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0,30000)) +
+  scale_y_continuous(breaks = seq(0, 30000, 5000), limits = c(0,30000)) +
   theme_custom() +
   theme(legend.position = "none",
         strip.background = element_blank(),
@@ -1996,7 +2012,7 @@ exceedance_plot_nadir_max_strain <- ggplot(exceed_data_nadir_strain_50, aes(x = 
   geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
   scale_color_manual(values = c("Original" = "red1", "Modified" = "pink4")) +
   scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
-  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0, 30000)) +
+  scale_y_continuous(breaks = seq(0, 30000, 5000), limits = c(0, 30000)) +
   scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
   labs(
     x = "Percentage Exceedance (%)",
@@ -2060,7 +2076,7 @@ max_strain_boxplot_post_nadir <- ggplot(max_strain_data_post_nadir_50, aes(y = m
     x = "Kernel Density",
     y = expression("Mean strain rate (l s"^-1*")")
   ) +
-  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0,30000)) +
+  scale_y_continuous(breaks = seq(0, 30000, 5000), limits = c(0,30000)) +
   theme_custom() +
    theme(legend.position = "none",
         strip.background = element_blank(),
@@ -2074,7 +2090,7 @@ exceedance_plot_post_nadir_max_strain <- ggplot(exceed_data_post_nadir_strain_50
   geom_line(aes(color = configuration, linetype = configuration), linewidth = 1) +
   scale_color_manual(values = c("Original" = "steelblue4", "Modified" = "steelblue2")) +
   scale_linetype_manual(values = c("Original" = "solid", "Modified" = "solid")) +
-  scale_y_continuous(breaks = seq(0, 30000, 1000), limits = c(0, 30000)) +
+  scale_y_continuous(breaks = seq(0, 30000, 5000), limits = c(0, 30000)) +
   scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
   labs(
     x = "Percentage Exceedance (%)",
@@ -2102,20 +2118,22 @@ combined_max_strain_plot_50
 ```
 
 
+
 ## 5.3 Strain analysis
 
 ```{r strain_analysis}
 
-# Core analysis here
+# testing differences between mean_strain in nadir region between different operational scenarios
 kruskal.test(mean_mean_strain ~ treatment,
              data = strain_data_nadir)
 
 
-
+# testing differences between mean_strain in post-nadir region between different operational scenarios
 kruskal.test(mean_mean_strain ~ treatment,
              data = strain_data_post_nadir)
 
 
+#testing differences in nadir region between mean strain in 50_M and 50_O
 ad.test(
   strain_data_nadir_50$mean_mean_strain[strain_data_nadir_50$
                                      configuration == "Original"],
@@ -2128,7 +2146,7 @@ wilcox.test(mean_mean_strain ~ configuration,
 
 
 
-
+#testing differences in post-nadir region between mean strain in 50_M and 50_O
 ad.test(
   strain_data_post_nadir_50$mean_mean_strain[strain_data_post_nadir_50$
                                      configuration == "Original"],
@@ -2213,5 +2231,871 @@ survival_plot
 #        width = 18, 
 #        height = 10, 
 #        units = "cm")
+
+```
+# 7. Import backpack data
+
+```{r backpack_data_import}
+
+backpack_files <- list.files(
+  "./input",
+  pattern = "^backpack_.*\\.csv$",
+  full.names = TRUE
+)
+
+backpack_data <- backpack_files %>%
+  map_dfr(read_csv)
+
+#import extra 50_M BDS data with calculated zero-crossings
+BDS_50rpm_modified <- list.files(
+  "./input",
+  pattern = "^BDS_.*\\.csv$",
+  full.names = TRUE
+)
+
+BDS_50rpm_data <- BDS_50rpm_modified %>%
+  map_dfr(read_csv)
+
+
+```
+
+##7.1 Visualize Example passage plot of backpack data
+
+```{r EEL04_plot}
+
+#### Create example passage plot 
+
+EEL04 <- backpack_data %>%
+  filter (long_id == "EEL040129130045")
+
+# # Plot plotly to identify trim times etc
+# plot_ly(EEL04, x = ~Time) %>%
+#   add_lines(y = ~pres, name = "Pres", line = list(color = "black"), yaxis = "y") %>%
+#   add_lines(y = ~accmag, name = "Acc", line = list(color = "red"), yaxis = "y2") %>%
+#   layout(
+#     xaxis = list(title = "Time (s)"),
+#     yaxis = list(title = "Pressure (kPa)", titlefont = list(color = "black")),
+#     yaxis2 = list(title = "Acceleration Magnitude (g)", titlefont = list(color = "red"),
+#                   overlaying = "y", side = "right")
+#   )
+
+
+# decided to Trim data
+# 3s plot
+EEL04 <-EEL04 %>%
+  filter(Time >= 15.561, Time <=18.471)
+
+# Identify ROI boundaries 
+roi_changes_eel <- EEL04 %>%
+  mutate(roi_change = roi != lag(roi, default = first(roi))) %>%
+  filter(roi_change) %>%
+  pull(Time)
+
+#Identify accmag and pressure min max for secondary axis scaling
+pres_min_eel <- 90.644
+pres_max_eel <- 109.085
+accmag_min_eel <- min(EEL04$accmag)  
+accmag_max_eel <- 67.81396
+
+# Calculate scaling to map accmag range onto pressure range
+scale_factor_eel <- (pres_max_eel - pres_min_eel) / (accmag_max_eel - accmag_min_eel)
+offset_eel <- pres_min_eel - accmag_min_eel * scale_factor_eel
+
+
+EEL04_plot <- ggplot(EEL04, aes(x = Time)) +
+  geom_rect(data = EEL04 %>%
+              summarise(xmin = min(Time), xmax = max(Time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "grey90", alpha = 0.1, inherit.aes = FALSE) +
+  geom_rect(data = EEL04 %>% filter(roi == "Nadir") %>% 
+              summarise(xmin = min(Time), xmax = max(Time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "#F4A6A3", alpha = 0.1, inherit.aes = FALSE) +
+  geom_rect(data = EEL04 %>% filter(roi == "Post-Nadir") %>% 
+              summarise(xmin = min(Time), xmax = max(Time)),
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
+            fill = "#A8DADC", alpha = 0.1, inherit.aes = FALSE) +
+  geom_line(aes(y = pres), color = "black", size = 0.5) +
+  geom_line(aes(y = accmag * scale_factor_eel + offset_eel), color = "red2", size = 0.5) +
+  geom_vline(xintercept = roi_changes_eel, color = "blue4", linetype = "dotted") +
+  scale_x_continuous(breaks = seq(15, 19, by = 0.25), expand = c(0,0)) +
+  scale_y_continuous(
+    name = "Pressure (kPa)",
+    breaks = seq(90, 110, by = 2),
+    limits = c(90, 110),
+    sec.axis = sec_axis(
+      ~ (. - offset) / scale_factor, 
+      name = expression("Acceleration Magnitude (m s" ^-2*")"),
+      breaks = seq(0, 110, by = 10)
+    )
+  ) +
+  labs(x = "Time (s)") +
+  theme_custom() +
+  theme(
+    axis.title.y.right = element_text(color = "red2"),
+    axis.text.y.right = element_text(color = "red2"),
+    axis.text.x = element_text(angle = 90)
+  ) +
+  coord_cartesian(clip = "off")
+
+EEL04_plot
+
+```
+
+##7.2 backpack pressure data preperation
+
+```{r backpack_pres_prep}
+
+
+
+#find nadir pressure time and row 
+
+nadir_tbl_eel <- backpack_data %>%
+  mutate(row_index = row_number()) %>%          # index in the full table
+  filter(roi == "Nadir", !is.na(pres), !is.na(Time)) %>%
+  group_by(long_id, treatment) %>%
+  slice_min(order_by = pres, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    long_id,
+    treatment,
+    nadir = pres,
+    nadir_time = Time
+  )
+
+
+
+#find maximum pressure within 1s before nadir pressure for every sensor per treatment
+max_pres_before_nadir_eel <- backpack_data %>%
+  mutate(row_index = row_number()) %>%
+  inner_join(nadir_tbl_eel, by = c("long_id", "treatment")) %>%
+  group_by(long_id, treatment, nadir, nadir_time) %>%
+  # keep only samples in [nadir_time - 1, nadir_time)
+  filter(!is.na(Time), !is.na(pres),
+         Time >= (nadir_time - 1),
+         Time < nadir_time) %>%
+  # take the row with maximum pressure in that window
+  slice_max(order_by = pres, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    long_id, treatment,
+    nadir, nadir_time, 
+    max_p_1s_nadir = pres,
+    max_p_1s_nadir_time = Time
+  )
+
+# calculating rate pressure change (rpc) and log ration pressure change (lrpc)
+#setting surface acclimation pressure to 100 kPa (at 0m)
+acclim_press <- 100
+
+pressure_tbl_eel <- max_pres_before_nadir_eel %>%
+  mutate(
+    rate_pc  = max_p_1s_nadir - nadir,
+    ratio_pc = acclim_press/ nadir,
+    log_rpc  = log(ratio_pc)
+  ) %>%
+  transmute(long_id, treatment, nadir, rate_pc, ratio_pc, log_rpc)
+
+
+
+```
+
+
+##7.3 backpack pressure data summary
+
+```{r backpack_pres_sum}
+
+# Summarise and tabulate pressure variables across treatments etc
+
+summary_pres_tbl_eel <- pressure_tbl_eel %>%
+  group_by(treatment) %>%
+  summarise(
+    n = n(),
+    across(
+      c(nadir, rate_pc, ratio_pc, log_rpc),
+      list(
+        median = ~ median(.x, na.rm = TRUE),
+        mean   = ~ mean(.x, na.rm = TRUE),
+        Q1     = ~ quantile(.x, 0.25, na.rm = TRUE),
+        Q3     = ~ quantile(.x, 0.75, na.rm = TRUE),
+        IQR    = ~ IQR(.x, na.rm = TRUE),
+        sd     = ~ sd(.x, na.rm = TRUE),
+        min    = ~ min(.x, na.rm = TRUE),
+        max    = ~ max(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    -treatment,
+    names_to = "variable_stat",
+    values_to = "value"
+  ) %>%
+  pivot_wider(
+    names_from = treatment,
+    values_from = value
+  )
+
+summary_pres_tbl_eel
+
+```
+
+
+##7.4 backpack pressure vis
+```{r bakpack_pres_vis}
+
+# Build core figures here
+nadir_plot_eel<-ggplot(pressure_tbl_eel, aes(x = treatment, y = nadir)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 50, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = "a)", hjust = -0.2, vjust = 1.2, size = 3.5) +
+  theme_minimal() +
+  theme_custom() +
+   theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = "Nadir pressure (kPa)") +
+  scale_y_continuous(limits =c(50,105),
+                     breaks = seq(50, 100, 10)) +
+  coord_cartesian( clip = "off")
+ 
+#nadir_plot_eel
+
+
+rpc_plot_eel <- ggplot(pressure_tbl_eel, aes(x = treatment, y = rate_pc)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4,# outlier.alpha = 0.8,
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 550, colour = "red", linetype = "dashed", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = "b)", hjust = -0.2, vjust = 1.2, size = 3.5) +
+    theme_minimal() +
+  theme_custom() +
+  theme(
+    #axis.text.x = element_text(angle = 65, hjust = 1),
+    axis.text.y.right  = element_blank(),
+    axis.ticks.y.right = element_blank(),
+    axis.title.y.right = element_blank()
+  ) +
+  labs(x = NULL, y = expression("Rate pressure change (kPa s"^-1*")")) +
+  scale_y_continuous(breaks = seq(0, 560, 50)) +
+  #scale_y_break(c(55, 500), scales = 0.6) +
+  coord_cartesian(clip = "off")
+
+#rpc_plot_eel
+
+
+lrpc_plot_eel <- ggplot(pressure_tbl_eel, aes(x = treatment, y = log_rpc)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, #outlier.alpha = 0.8,     # "x"
+               outlier.size = 0.9 ,outlier.stroke = 0.4, staplewidth = 0.5) +
+  geom_hline(yintercept = 0.5, colour = "red", linetype = "dashed",  linewidth = 0.5)+
+  #theme_minimal() +
+  annotate(
+    "text",
+    x = -Inf,
+    y = Inf,
+    label = "c)",
+    hjust = -0.2,
+    vjust = 1.2,
+    size = 3.5
+  ) +
+  labs(#title = "log_RPC by RPM Scenario",
+    x = NULL,
+    y = "Log ratio pressure change")+
+  theme_custom() +
+  scale_y_continuous(limits = c(0,0.55),
+                     breaks = seq(0, 0.55, 0.1)) +
+  coord_cartesian( clip = "off")
+
+
+#lrpc_plot_eel
+
+
+pres_plots_eel <- plot_grid(nadir_plot_eel, rpc_plot_eel, lrpc_plot_eel,
+                        ncol = 3, nrow = 1)
+
+pres_plots_eel
+
+#ggsave(filename = "pres_plots_eel.svg", plot = pres_plots_eel,
+#       device = "svg", units = "cm", width = 16, height = 8, dpi = 300)
+```
+
+
+##7.6 passage duration in region 1 
+
+```{r backpack_pres_duration}
+
+backpack_roi1 <- backpack_data %>%
+  group_by(long_id) %>%
+  mutate(
+    first_nadir_time = min(Time[roi == "Nadir"], na.rm = TRUE)
+  ) %>%
+  filter(
+    roi == "unlabelled",
+    Time < first_nadir_time
+  ) %>%
+  ungroup()
+
+
+BDS_50rpm_roi1 <- BDS_50rpm_data %>%
+  group_by(long_id) %>%
+  mutate(
+    first_nadir_time = min(time[roi == "nadir"], na.rm = TRUE)
+  ) %>%
+  filter(
+    roi == "unlabeled",
+    time < first_nadir_time
+  ) %>%
+  ungroup()
+
+
+passage_duration_r1 <- backpack_roi1 %>%
+  group_by(long_id) %>%
+  summarise(
+    start_time = min(Time, na.rm = TRUE),
+    end_time   = max(Time, na.rm = TRUE),
+    duration_r1 = end_time - start_time,
+    sensor= "backpack",
+    .groups = "drop"
+  )
+
+
+passage_duration_BDS_r1 <- BDS_50rpm_roi1 %>%
+  group_by(long_id) %>%
+  summarise(
+    start_time = min(time, na.rm = TRUE),
+    end_time   = max(time, na.rm = TRUE),
+    duration_r1 = end_time - start_time,
+    sensor= "BDS",
+    .groups = "drop"
+  )
+
+passage_duration <- bind_rows(passage_duration_r1, passage_duration_BDS_r1)
+
+zero_crossings_roi1 <- backpack_roi1 %>%
+  group_by(long_id) %>%
+  summarise(
+    zero_crossings_X = sum(zeroX == 1, na.rm = TRUE),
+    sensor= "backpack",
+    .groups = "drop"
+  )
+
+
+zero_crossings_BDS_roi1 <- BDS_50rpm_roi1 %>%
+  group_by(long_id) %>%
+  summarise(
+    zero_crossings_X = sum(zeroX == 1, na.rm = TRUE),
+    sensor= "BDS",
+    .groups = "drop"
+  )
+
+
+zero_crossings <- bind_rows(zero_crossings_BDS_roi1, zero_crossings_roi1)
+
+ODBA_roi1 <- backpack_roi1 %>%
+   group_by(long_id) %>%
+  summarise(mean_ODBA = mean(ODBA, na.rm = TRUE),
+            sensor= "backpack", .groups = "drop")
+
+
+ODBA_BDS_roi1 <- BDS_50rpm_roi1 %>%
+   group_by(long_id) %>%
+  summarise(mean_ODBA = mean(ODBA, na.rm = TRUE),
+            sensor = "BDS", .groups = "drop")
+
+
+ODBA <- bind_rows(ODBA_BDS_roi1, ODBA_roi1)
+
+
+backpack_data <- backpack_data %>%
+  mutate(sensor = "backpack")%>%
+  rename(time =Time)
+
+BDS_50rpm_data <- BDS_50rpm_data%>%
+  mutate(sensor = "BDS")
+
+sensor_data <- bind_rows(backpack_data, BDS_50rpm_data)
+
+```
+
+##7.7 backpack summary
+
+```{r backpack_sum}
+
+passage_duration_r1 %>%
+    summarise(
+    n = n(),
+    median = median(duration_r1),
+    Q1 = quantile(duration_r1, 0.25),
+    Q3 = quantile(duration_r1, 0.75),
+    IQR = IQR(duration_r1),
+    mean = mean(duration_r1),
+    sd = sd(duration_r1),
+    .groups = "drop"
+  )
+
+zero_crossings_roi1 %>%
+    summarise(
+    n = n(),
+    median = median(zero_crossings_X),
+    Q1 = quantile(zero_crossings_X, 0.25),
+    Q3 = quantile(zero_crossings_X, 0.75),
+    IQR = IQR(zero_crossings_X),
+    mean = mean(zero_crossings_X),
+    sd = sd(zero_crossings_X),
+    .groups = "drop"
+  )
+
+
+ODBA_roi1 %>%
+    summarise(
+    n = n(),
+    median = median(mean_ODBA),
+    Q1 = quantile(mean_ODBA, 0.25),
+    Q3 = quantile(mean_ODBA, 0.75),
+    IQR = IQR(mean_ODBA),
+    mean = mean(mean_ODBA),
+    sd = sd(mean_ODBA),
+    .groups = "drop"
+  )
+
+```
+##7.8 backpack vis
+```{r backpack_vis_duraion}
+
+duration_boxplot <- ggplot(passage_duration_r1,
+       aes(x = "", y = duration_r1)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+   labs(x = NULL,
+       y = "Passage duration in Region 1 (s)") +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#duration_boxplot
+
+
+zero_crossings_boxplot <- ggplot(zero_crossings_roi1,
+       aes(x = "", y = zero_crossings_X)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+  labs(x = NULL,
+       y = "Number of zero-crossings (rotation) in Region 1") +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#zero_crossings_boxplot
+
+
+mean_ODBA_boxplot <- ggplot(ODBA_roi1,
+       aes(x = "", y = mean_ODBA)) +
+   stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+  labs(x = NULL,
+       y = expression("mean ODBA (m s"^-2*") in Region 1")) +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#mean_ODBA_boxplot
+
+
+backpack_vis <- plot_grid(duration_boxplot, zero_crossings_boxplot, mean_ODBA_boxplot,
+                        ncol = 3, nrow = 1)
+
+backpack_vis
+
+
+
+#ggsave("backpack_vis.svg",
+     #  backpack_vis,
+     # units = "cm",
+     #  width = 16,
+      # height = 16)
+```
+
+
+##7.9 backpack vs BDS vis ODBA, passage duration, zero-crossings in region 1
+
+```{r backpack_comparison_vis}
+
+duration_boxplot_2 <- ggplot(passage_duration,
+       aes(x = sensor, y = duration_r1, fill = sensor)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+   scale_fill_manual(values = c(
+    "BDS" = "grey70",
+    "backpack" = "white"
+  )) +
+  labs(x = NULL,
+       y = "Passage duration in Region 1 (s)") +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#duration_boxplot_2
+
+
+zero_crossings_boxplot_2 <- ggplot(zero_crossings,
+       aes(x = sensor, y = zero_crossings_X, fill = sensor)) +
+  stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+   scale_fill_manual(values = c(
+    "BDS" = "grey70",
+    "backpack" = "white"
+  )) +
+  labs(x = NULL,
+       y = "Number of zero-crossings (rotation) in Region 1") +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#zero_crossings_boxplot_2
+
+
+mean_ODBA_boxplot_2 <- ggplot(ODBA_roi1,
+       aes(x = sensor, y = mean_ODBA)) +
+   stat_boxplot(geom = "errorbar", width = 0.3, position = position_dodge(0.9)) +
+  geom_boxplot(outlier.shape = 4, 
+               outlier.size = 0.9, outlier.stroke = 0.4, staplewidth = 0.5, color ="black") +
+  labs(x = NULL,
+       y = expression("mean ODBA (m s"^-2*") in Region 1")) +
+  theme_custom()+
+  theme(legend.position = "none")
+
+#mean_ODBA_boxplot_2
+
+
+backpack_vis_2 <- plot_grid(duration_boxplot_2, zero_crossings_boxplot_2, mean_ODBA_boxplot_2,
+                        ncol = 3, nrow = 1)
+
+backpack_vis_2
+
+
+
+#ggsave("backpack_vis_2.svg",
+     #  backpack_vis_2,
+     # units = "cm",
+     #  width = 16,
+      # height = 16)
+```
+##7.10 backpack comparison BDS data analysis
+
+```{r backpack_vs_BDs_analysis}
+#consider the difference in sample size
+#backpack n =14
+#BDS n=115
+
+wilcox.test(duration_r1 ~ sensor,
+            passage_duration)
+            
+wilcox.test(zero_crossings_X ~ sensor,
+            zero_crossings)
+```
+
+##7.11 backpack acceleration vis preparation
+```{r backpack_vs_BDs_acc_prep}
+
+# Filter and shape data accordingly for acceleration analysis
+
+#filter for nadir
+
+max_accmag_bp_nadir <- sensor_data %>%
+  filter(roi %in% c("nadir", "Nadir"))%>%
+  group_by(long_id, sensor) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_bp_nadir <- sensor_data %>% 
+  filter(roi %in% c("nadir", "Nadir"))%>%
+  group_by(long_id, sensor) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_bp_nadir <- plot_bp_nadir %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(sensor) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+# Get max accmag for each sensor in Post-nadir ROI
+max_accmag_bp_post <- sensor_data %>% 
+   filter(roi %in% c("1s_post", "Post-Nadir"))%>%
+  group_by(long_id, sensor) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+
+plot_bp_post <- sensor_data %>%
+   filter(roi %in% c("1s_post", "Post-Nadir"))%>%
+  group_by(long_id, sensor) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_bp_post <- plot_bp_post %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(sensor) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+```
+
+##7.12 backpack acceleration vis
+```{r acc_vis}
+
+# Build core figures here
+#core figures for 50_O and 50_M
+
+bp_labels <- max_accmag_bp_nadir %>%
+  group_by(sensor) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+max_accmag_boxplot_nadir_bp <- ggplot(max_accmag_bp_nadir, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = sensor),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = sensor),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = sensor,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("backpack" = "red1", "BDS" = "pink4")) +
+  scale_fill_manual(values = c("backpack" = "red1", "BDS" = "pink4")) +
+  geom_text(
+    data = bp_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~sensor,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(sensor = c(
+      "backpack" = "backpack sensors",
+      "BDS" = "BDS sensors"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()
+  )
+#coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_nadir_bp
+
+
+exceedance_plot_nadir_bp <- ggplot(exceed_bp_nadir, aes(x = exceed_pct, y = accmag, group = sensor)) +
+  geom_line(aes(color = sensor, linetype = sensor), linewidth = 1) +
+  scale_color_manual(values = c("backpack" = "red1", "BDS" = "pink4")) +
+  scale_linetype_manual(values = c("backpack" = "solid", "BDS" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Sensor"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())+
+  coord_cartesian(clip = "off")
+
+#exceedance_plot_nadir_bp
+
+combined_plot_nadir_bp <-plot_grid(max_accmag_boxplot_nadir_bp, exceedance_plot_nadir_bp,
+                                ncol = 2, nrow = 1, rel_widths = c(0.6,0.4), align = "h",axis = "tb")
+#combined_plot_nadir_bp
+
+max_accmag_boxplot_post_bp <- ggplot(max_accmag_bp_post, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = sensor),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = sensor),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = sensor,x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  )+
+  scale_color_manual(values = c("backpack" = "steelblue4",
+                                "BDS" = "steelblue2")) +
+  scale_fill_manual(values = c("backpack" = "steelblue4", 
+                               "BDS" = "steelblue2")) +
+  geom_text(
+    data = bp_labels,
+    aes(label = paste0("sensor (n) = ", n), x = 0.95, y = 200)
+  )+
+  coord_flip() +
+  facet_wrap(
+    ~sensor,
+    ncol = 1,
+    strip.position = "top",
+    labeller = labeller(csensor = c(
+      "backpack" = "backpack sensors",
+      "BDS" = "BDS sensors"
+    ))
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0,230)) +
+  theme_custom() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 90)
+  )
+  #coord_cartesian(clip = "off")
+
+#max_accmag_boxplot_post
+
+exceedance_plot_post_bp <- ggplot(exceed_bp_post, aes(x = exceed_pct, y = accmag, group = sensor)) +
+  geom_line(aes(color = sensor, linetype = sensor), linewidth = 1) +
+  scale_color_manual(values = c("backpack" = "steelblue4", "BDS" = "steelblue2")) +
+  scale_linetype_manual(values = c("backpack" = "solid", "BDS" = "solid")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Sensor"
+  ) +
+  theme_custom() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))+
+coord_cartesian(clip = "off")
+
+#exceedance_plot_post
+
+combined_plot_post_nadir_bp <-plot_grid(max_accmag_boxplot_post_bp,
+                                     exceedance_plot_post_bp,
+                          ncol = 2, nrow = 1, rel_widths = c(0.6,0.4),
+                          align = "h",axis = "tb")
+#combined_plot_post_nadir_bp
+
+
+
+combined_acc_plot_bp <-plot_grid(combined_plot_nadir_bp, 
+                              combined_plot_post_nadir_bp,
+                              ncol = 1, nrow = 2,
+                              rel_heights =  c(0.465,0.535), align = "h",axis = "tb")
+combined_acc_plot_bp
+
+
+#ggsave("combined_acc_plot_bp.svg",
+     #  combined_acc_plot_bp,
+      # units = "cm",
+      # width = 16,
+      # height = 16)
+
+
+```
+
+
+
+##7.13 backpack acceleration data analyis
+
+```{r acc_bp_comparison_BDS_analysis}
+
+#consider the difference in sample size
+#backpack n =14
+#BDS n=115
+
+ad.test(
+  max_accmag_bp_nadir$max_accmag[max_accmag_bp_nadir$
+                                     sensor == "backpack"],
+  max_accmag_bp_nadir$max_accmag[max_accmag_bp_nadir$
+                                     sensor == "BDS"]
+  )
+
+wilcox.test(max_accmag ~ sensor,
+            max_accmag_bp_nadir)
+
+
+ad.test(
+  exceed_bp_nadir$accmag[exceed_bp_nadir$
+                             sensor == "backpack"],
+  exceed_bp_nadir$accmag[exceed_bp_nadir$
+                             sensor == "BDS"]
+  )
+
+ad.test(
+  max_accmag_bp_post$max_accmag[max_accmag_bp_post$
+                                   sensor == "backpack"],
+  max_accmag_bp_post$max_accmag[max_accmag_bp_post$
+                                    sensor == "BDS"]
+  )
+
+wilcox.test(max_accmag ~ sensor,
+            max_accmag_bp_post)
+
+ad.test(
+  exceed_bp_post$accmag[exceed_bp_post$
+                           sensor == "backpack"],
+  exceed_bp_post$accmag[exceed_bp_post$
+                          sensor == "BDS"]
+  )
+
 
 ```
