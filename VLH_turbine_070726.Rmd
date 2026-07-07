@@ -1,24 +1,13 @@
 ---
-title: "VLH_turbine_090226"
+title: "VLH_turbine_070726"
 output: html_document
-date: "2026-02-09"
+date: "2026-07-07"
 editor_options: 
   markdown: 
     wrap: 72
 ---
 
 # Introduction
-
-*Go through this analysis and add descriptions, results etc where
-necessary. The document should be able to run visa 'run \> run
-all'.....*
-
-**Transfer from processing stage to analysis stage**
-
-Data used throughout this analysis has been processed using the
-semi-automated analysis script. 'R_BDS_import.R' The script is designed
-to assist the user in processing multiple RAPID data files to extract
-key variables on pressure and acceleration.
 
 **Identification & Basic Info**
 
@@ -695,6 +684,66 @@ exceed_data_post_40 <- plot_data_post_40 %>%
   ) %>%
   ungroup()
 
+
+# Filter and shape data for acceleration analysis (all RPMs and configurations)
+
+# Nadir ROI
+max_accmag_data_nadir <- denver_data %>%
+  filter(!rpm %in% c(30, 60)) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, rpm, configuration) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_data_nadir <- denver_data %>% 
+  filter(!rpm %in% c(30, 60)) %>%
+  filter(roi == "Nadir") %>%
+  group_by(long_id, rpm, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(time_post = time - min(time)) %>%
+  ungroup()
+
+exceed_data_nadir <- plot_data_nadir %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(rpm, configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+# Post-nadir ROI
+max_accmag_data_post <- denver_data %>% 
+  filter(!rpm %in% c(30, 60)) %>%
+  filter(roi == "Post-nadir") %>%
+  group_by(long_id, rpm, configuration) %>%
+  summarise(max_accmag = max(abs(accmag)), .groups = "drop")
+
+plot_data_post <- denver_data %>%
+  filter(!rpm %in% c(30, 60)) %>%
+  filter(roi == "Post-nadir") %>% 
+  group_by(long_id, rpm, configuration) %>%
+  arrange(time, .by_group = TRUE) %>%
+  mutate(
+    time_post = time - min(time),
+    mean_strain = round(mean_strain)
+  ) %>%
+  ungroup()
+
+exceed_data_post <- plot_data_post %>%
+  mutate(accmag = abs(accmag)) %>%
+  filter(accmag > 10) %>%
+  group_by(rpm, configuration) %>%
+  arrange(accmag, .by_group = TRUE) %>%
+  mutate(
+    p_rank = percent_rank(accmag),
+    exceed_pct = (1 - p_rank) * 100
+  ) %>%
+  ungroup()
+
+
+
 ```
 
 ## 4.1 Acceleration summary
@@ -724,6 +773,237 @@ max_accmag_data_post %>%
 ## 4.2 Acceleration vis
 
 ```{r acc_vis}
+# Build core figures for all RPMs and configurations
+
+# Create n labels for each rpm/configuration combo
+n_labels <- max_accmag_data_nadir %>%
+  group_by(rpm, configuration) %>%
+  summarise(n = n_distinct(long_id), .groups = "drop")
+
+# Create treatment interaction variable for consistent coloring
+max_accmag_data_nadir <- max_accmag_data_nadir %>%
+  mutate(treatment = interaction(rpm, configuration, sep = "_"))
+
+max_accmag_data_post <- max_accmag_data_post %>%
+  mutate(treatment = interaction(rpm, configuration, sep = "_"))
+
+exceed_data_nadir <- exceed_data_nadir %>%
+  mutate(treatment = interaction(rpm, configuration, sep = "_"))
+
+exceed_data_post <- exceed_data_post %>%
+  mutate(treatment = interaction(rpm, configuration, sep = "_"))
+
+# Define color palette for 4 treatments
+colors_nadir <- c("40_Original" = "red1", "40_Modified" = "pink4",
+                  "50_Original" = "red3", "50_Modified" = "pink3")
+
+colors_post <- c("40_Original" = "steelblue4", "40_Modified" = "steelblue2",
+                 "50_Original" = "steelblue3", "50_Modified" = "lightblue3")
+
+# NADIR PLOTS
+max_accmag_boxplot_nadir <- ggplot(max_accmag_data_nadir, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = treatment),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = treatment),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = treatment, x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  ) +
+  scale_color_manual(values = colors_nadir) +
+  scale_fill_manual(values = colors_nadir) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("n = ", n), x = 0.95, y = 200),
+    size = 3
+  ) +
+  coord_flip() +
+  facet_wrap(
+    ~rpm + configuration,
+    ncol = 2,
+    strip.position = "top",
+    labeller = labeller(
+      rpm = c("40" = "40 RPM", "50" = "50 RPM"),
+      configuration = c("Original" = "Original", "Modified" = "Modified")
+    )
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  theme_custom() +
+  theme(
+    legend.position = "none",
+            strip.background = element_blank(),
+        strip.text = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank()
+  )
+
+exceedance_plot_nadir <- ggplot(exceed_data_nadir, aes(x = exceed_pct, y = accmag)) +
+  geom_line(
+    aes(color = treatment, linetype = configuration), 
+    linewidth = 1
+  ) +
+  scale_color_manual(values = colors_nadir) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "dashed")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment",
+    linetype = "Configuration"
+  ) +
+  theme_custom() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_blank(), 
+    axis.title.x = element_blank()
+  ) +
+  coord_cartesian(clip = "off")
+
+combined_plot_nadir <- plot_grid(
+  max_accmag_boxplot_nadir, 
+  exceedance_plot_nadir,
+  ncol = 2, 
+  nrow = 1, 
+  rel_widths = c(0.6, 0.4), 
+  align = "h",
+  axis = "tb"
+)
+
+# POST-NADIR PLOTS
+max_accmag_boxplot_post <- ggplot(max_accmag_data_post, aes(y = max_accmag)) +
+  stat_halfeye(
+    aes(fill = treatment),
+    side = "right",
+    adjust = 0.5,
+    slab_alpha = 0.2,
+    slab_linewidth = 0.8,
+    .width = 0
+  ) +
+  geom_boxplot(
+    aes(color = treatment),
+    width = 0.2,
+    outlier.shape = 4, 
+    orientation = "horizontal",
+    staplewidth = 0.5,
+    linewidth = 0.8,
+    outlier.size = 2.5,
+    outlier.stroke = 0.8
+  ) +
+  geom_jitter(
+    aes(color = treatment, x = 0),
+    width = 0.15,
+    height = 0,
+    alpha = 0.4,
+    size = 1
+  ) +
+  scale_color_manual(values = colors_post) +
+  scale_fill_manual(values = colors_post) +
+  geom_text(
+    data = n_labels,
+    aes(label = paste0("n = ", n), x = 0.95, y = 200),
+    size = 3
+  ) +
+  coord_flip() +
+  facet_wrap(
+    ~rpm + configuration,
+    ncol = 2,
+    strip.position = "top",
+    labeller = labeller(
+      rpm = c("40" = "40 RPM", "50" = "50 RPM"),
+      configuration = c("Original" = "Original", "Modified" = "Modified")
+    )
+  ) +
+  labs(
+    x = "Kernel Density",
+    y = expression("Max Acceleration Magnitude (m s"^-2*")")
+  ) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  theme_custom() +
+  theme(
+    legend.position = "none",
+            strip.background = element_blank(),
+        strip.text = element_blank(),
+    axis.text.x = element_text(angle = 90)
+  )
+
+exceedance_plot_post <- ggplot(exceed_data_post, aes(x = exceed_pct, y = accmag)) +
+  geom_line(
+    aes(color = treatment, linetype = configuration), 
+    linewidth = 1
+  ) +
+  scale_color_manual(values = colors_post) +
+  scale_linetype_manual(values = c("Original" = "solid", "Modified" = "dashed")) +
+  scale_y_continuous(breaks = seq(0, 230, 25), limits = c(0, 230)) +
+  scale_x_continuous(breaks = seq(0, 100, 10), limits = c(0, 100), expand = c(0.01, 0)) +
+  labs(
+    x = "Percentage Exceedance (%)",
+    y = expression("Acceleration Magnitude (m s"^-2*")"),
+    color = "Treatment",
+    linetype = "Configuration"
+  ) +
+  theme_custom() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90)
+  ) +
+  coord_cartesian(clip = "off")
+
+combined_plot_post_nadir <- plot_grid(
+  max_accmag_boxplot_post,
+  exceedance_plot_post,
+  ncol = 2, 
+  nrow = 1, 
+  rel_widths = c(0.6, 0.4),
+  align = "h",
+  axis = "tb"
+)
+
+# FINAL COMBINED PLOT
+combined_acc_plot <- plot_grid(
+  combined_plot_nadir, 
+  combined_plot_post_nadir,
+  ncol = 1, 
+  nrow = 2,
+  rel_heights = c(0.465, 0.535), 
+  align = "h",
+  axis = "tb"
+)
+
+combined_acc_plot
+
+ggsave("combined_acc_plot.svg",
+       combined_acc_plot,
+       units = "cm",
+       width = 24,
+       height = 16)
+
+
+
+```
+
+```{r}
 
 # Build core figures here
 #core figures for 50_O and 50_M
@@ -1466,11 +1746,11 @@ combined_acc_plot_mod <-plot_grid(combined_plot_mod_nadir,
 combined_acc_plot_mod
 
 
-#ggsave("combined_acc_plot_mod.svg",
-     #  combined_acc_plot_mod,
-     # units = "cm",
-     #  width = 16,
-      # height = 16)
+ggsave("combined_acc_plot_mod.svg",
+ combined_acc_plot_mod,
+units = "cm",
+ width = 16,
+height = 16)
 
 ```
 
@@ -1493,7 +1773,7 @@ ad.test(
 wilcox.test(max_accmag ~ rpm,
             max_accmag_data_mod_nadir)
 
-ad.test(
+ks.test(
   exceed_data_mod_nadir$accmag[exceed_data_mod_nadir$
                              rpm == "40"],
   exceed_data_mod_nadir$accmag[exceed_data_mod_nadir$
@@ -2167,14 +2447,15 @@ Calculate 95% 'Wilson binomial confidence intervals and build visualization.
 
 survival_data <- tibble(
   species = c(
-    "Roach (Rutilus rutilus)",
     "European eel (Anguilla anguilla) - adult",
     "European eel (Anguilla anguilla) - juvenile",
-    "Bream (Abramis brama)",
-    "Brown trout (Salmo trutta)"
+    "Brown trout (Salmo trutta)",
+    "Roach (Rutilus rutilus)",
+    "Bream (Abramis brama)"
   ),
-  total_recap = c(239, 46, 219, 208, 211),
-  total_surv  = c(237, 46, 219, 207, 211),
+  total_fish  = c(54, 670, 290, 292, 231),
+  total_recap = c(46, 219, 211, 239, 208),
+  total_surv  = c(46, 219, 211, 237, 207),
   group       = NA,
   survival    = NA,
   lower_ci    = NA,
@@ -2189,11 +2470,13 @@ survival_ci <- survival_data %>%
                      ~binom.confint(.x, .y, methods = "wilson"))
   ) %>%
   unnest(ci_result) %>%
-  select(species, group, total_recap, total_surv, 
+  select(species, group, total_fish, total_recap, total_surv, 
          survival = mean, lower_ci = lower, upper_ci = upper)
 
 survival_ci %>% 
   select(-group)
+
+binom.confint(34, 80, methods = "wilson")
 
 ```
 
@@ -2212,11 +2495,12 @@ survival_plot <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
   geom_errorbarh(aes(xmin = lower_ci * 100, xmax = upper_ci * 100), 
                  height = 0.2, linewidth = 0.5) +
   geom_point(size = 2, shape = 16) +
-  geom_text(aes(label = paste0("italic(n) == ", total_recap)), 
-            x = 90.5, hjust = 0, size = 3.5, parse = TRUE) +
+geom_text(aes(label = paste0("atop(italic('(n) fish') == ", total_fish, 
+                             ", italic('(n) recap') == ", total_recap, ")")), 
+          x = 90.5, hjust = 0, vjust = 1.2, size = 3, parse = TRUE)+
   annotate("text", x = 90, y = Inf, 
            label = "CI = 95% (Wilson Binomial)\nMargin = 2%",
-           hjust = 0, vjust = 1, size = 3.5, lineheight = 0.9) +
+           hjust = 0, vjust = 1.5, size = 3.5, lineheight = 0.9) +
   scale_x_continuous(limits = c(90, 100), 
                      breaks = seq(90, 100, 1)) +
   labs(x = "Survival Probability (%)",
@@ -2226,11 +2510,11 @@ survival_plot <- ggplot(impact_data, aes(x = survival * 100, y = species)) +
 
 survival_plot
 
-# ggsave("survival_plot.svg", 
-#        plot = survival_plot, 
-#        width = 18, 
-#        height = 10, 
-#        units = "cm")
+ggsave("survival_plot.svg",
+       plot = survival_plot,
+       width = 18,
+       height = 10,
+       units = "cm")
 
 ```
 # 7. Import backpack data
